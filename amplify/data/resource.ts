@@ -25,7 +25,7 @@ const schema = a.schema({
       addressValidationStatus: a.string().default('pending'), // 'pending', 'queued', 'valid', 'invalid', 'error', 'overridden'
       addressValidationMessage: a.string(), // Error message or validation details
       addressValidatedAt: a.datetime(), // When validation was last performed
-      validatedAddress1: a.string(), // USPS/Geoapify validated address
+      validatedAddress1: a.string(), // Google Maps validated address
       validatedAddress2: a.string(),
       validatedCity: a.string(),
       validatedState: a.string(),

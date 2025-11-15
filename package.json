@@ -12,7 +12,9 @@
     "lint": "eslint . --fix",
     "format": "prettier --write src/",
     "amplify": "ampx",
-    "amplify-version": "ampx --version"
+    "amplify-version": "ampx --version",
+    "amplify:sandbox": "AWS_PROFILE=softsys npx ampx sandbox",
+    "amplify:deploy": "AWS_PROFILE=softsys npx ampx sandbox --once"
   },
   "dependencies": {
     "@aws-amplify/ui-vue": "^4.3.3",

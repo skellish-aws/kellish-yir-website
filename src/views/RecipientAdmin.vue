@@ -15,27 +15,27 @@
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-blue-50 p-4 rounded-lg">
-        <div class="text-2xl font-bold text-blue-600">{{ totalRecipients }}</div>
-        <div class="text-sm text-blue-600">Total Recipients</div>
+      <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg">
+        <div class="text-2xl font-bold text-blue-600 dark:text-blue-300">{{ totalRecipients }}</div>
+        <div class="text-sm text-blue-600 dark:text-blue-300">Total Recipients</div>
       </div>
-      <div class="bg-green-50 p-4 rounded-lg">
-        <div class="text-2xl font-bold text-green-600">{{ codesUsed }}</div>
-        <div class="text-sm text-green-600">Codes Used</div>
+      <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg">
+        <div class="text-2xl font-bold text-green-600 dark:text-green-300">{{ codesUsed }}</div>
+        <div class="text-sm text-green-600 dark:text-green-300">Codes Used</div>
       </div>
-      <div class="bg-yellow-50 p-4 rounded-lg">
-        <div class="text-2xl font-bold text-yellow-600">{{ codesUnused }}</div>
-        <div class="text-sm text-yellow-600">Codes Unused</div>
+      <div class="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-lg">
+        <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-300">{{ codesUnused }}</div>
+        <div class="text-sm text-yellow-600 dark:text-yellow-300">Codes Unused</div>
       </div>
-      <div class="bg-purple-50 p-4 rounded-lg">
-        <div class="text-2xl font-bold text-purple-600">{{ sendCards }}</div>
-        <div class="text-sm text-purple-600">Send Cards</div>
+      <div class="bg-purple-50 dark:bg-purple-900 p-4 rounded-lg">
+        <div class="text-2xl font-bold text-purple-600 dark:text-purple-300">{{ sendCards }}</div>
+        <div class="text-sm text-purple-600 dark:text-purple-300">Send Cards</div>
       </div>
     </div>
 
     <!-- Filters -->
     <div class="mb-4">
-      <div class="flex gap-4">
+      <div class="flex gap-4 items-center">
         <div class="flex-1 relative">
           <InputText
             v-model="searchTerm"
@@ -55,10 +55,23 @@
         <Dropdown
           v-model="statusFilter"
           :options="statusOptions"
+          optionLabel="label"
+          optionValue="value"
           placeholder="Filter by status"
           class="w-48"
           @change="filterRecipients"
         />
+        <div class="flex items-center gap-2 bg-red-50 dark:bg-red-900 px-3 py-2 rounded border border-red-200 dark:border-red-700">
+          <Checkbox
+            v-model="showInvalidAddressesOnly"
+            inputId="invalidAddresses"
+            :binary="true"
+            @change="filterRecipients"
+          />
+          <label for="invalidAddresses" class="text-sm font-medium text-red-700 dark:text-red-300 cursor-pointer">
+            Show Invalid/Error/No Address
+          </label>
+        </div>
       </div>
       <div class="text-xs text-gray-500 mt-1 ml-1">
         Searches: Name, Email, City, State, Access Code
@@ -70,9 +83,9 @@
       <ProgressSpinner />
     </div>
 
-    <div v-else class="bg-white rounded-lg shadow overflow-hidden">
+    <div v-else class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
       <!-- Header Row -->
-      <div class="bg-gray-100 px-4 py-3 border-b font-semibold text-sm text-gray-700">
+      <div class="bg-gray-100 dark:bg-gray-700 px-4 py-3 border-b dark:border-gray-600 font-semibold text-sm text-gray-700 dark:text-gray-200">
         <div class="grid grid-cols-12 gap-4 items-center">
           <div class="col-span-1">
             <input
@@ -126,7 +139,7 @@
         <div
           v-for="recipient in filteredRecipients"
           :key="recipient.id"
-          class="px-4 py-3 hover:bg-gray-50 transition-colors"
+          class="px-4 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b dark:border-gray-700"
         >
           <div class="grid grid-cols-12 gap-4 items-center">
             <!-- Checkbox -->
@@ -147,23 +160,23 @@
                   `${recipient.firstName} ${recipient.lastName}${recipient.suffix ? ', ' + recipient.suffix : ''}`
                 }}
               </div>
-              <div v-if="recipient.mailingName" class="text-xs text-gray-400">
+              <div v-if="recipient.mailingName" class="text-xs text-gray-400 dark:text-gray-400">
                 {{ recipient.firstName }} {{ recipient.lastName }}
               </div>
-              <div v-else class="text-sm text-gray-500">{{ recipient.title }}</div>
+              <div v-else class="text-sm text-gray-500 dark:text-gray-300">{{ recipient.title }}</div>
             </div>
 
             <!-- Address -->
             <div class="col-span-2">
               <div class="flex items-start gap-2">
                 <div class="flex-1">
-                  <div v-if="recipient.address1" class="text-sm">{{ recipient.address1 }}</div>
-                  <div v-if="recipient.address2" class="text-sm text-gray-600">
+                  <div v-if="recipient.address1" class="text-sm text-gray-900 dark:text-gray-100">{{ recipient.address1 }}</div>
+                  <div v-if="recipient.address2" class="text-sm text-gray-600 dark:text-gray-300">
                     {{ recipient.address2 }}
                   </div>
                   <div
                     v-if="recipient.city || recipient.state || recipient.zipcode"
-                    class="text-sm text-gray-500"
+                    class="text-sm text-gray-500 dark:text-gray-300"
                   >
                     {{
                       [recipient.city, recipient.state, recipient.zipcode]
@@ -173,7 +186,7 @@
                   </div>
                   <div
                     v-if="!recipient.address1 && !recipient.city"
-                    class="text-sm text-gray-400 italic"
+                    class="text-sm text-gray-400 dark:text-gray-500 italic"
                   >
                     No address
                   </div>
@@ -183,27 +196,27 @@
                 <div v-if="recipient.address1" class="flex-shrink-0 mt-0.5">
                   <i
                     v-if="recipient.addressValidationStatus === 'valid'"
-                    class="pi pi-check-circle text-green-600 text-sm"
+                    class="pi pi-check-circle text-green-600 dark:text-green-400 text-sm"
                     :title="recipient.addressValidationMessage || 'Address verified'"
                   ></i>
                   <i
                     v-else-if="recipient.addressValidationStatus === 'invalid'"
-                    class="pi pi-exclamation-triangle text-yellow-600 text-sm"
+                    class="pi pi-exclamation-triangle text-yellow-600 dark:text-yellow-400 text-sm"
                     :title="recipient.addressValidationMessage || 'Address could not be validated'"
                   ></i>
                   <i
                     v-else-if="recipient.addressValidationStatus === 'error'"
-                    class="pi pi-times-circle text-red-600 text-sm"
+                    class="pi pi-times-circle text-red-600 dark:text-red-400 text-sm"
                     :title="recipient.addressValidationMessage || 'Validation failed'"
                   ></i>
                   <i
                     v-else-if="recipient.addressValidationStatus === 'queued'"
-                    class="pi pi-clock text-blue-600 text-sm animate-pulse"
+                    class="pi pi-clock text-blue-600 dark:text-blue-400 text-sm animate-pulse"
                     title="Validation in progress..."
                   ></i>
                   <i
                     v-else
-                    class="pi pi-question-circle text-gray-400 text-sm"
+                    class="pi pi-question-circle text-gray-400 dark:text-gray-500 text-sm"
                     title="Not yet validated"
                   ></i>
                 </div>
@@ -214,11 +227,11 @@
             <div class="col-span-2">
               <div
                 v-if="recipient.accessCode"
-                class="font-mono text-sm bg-gray-100 px-2 py-1 rounded"
+                class="font-mono text-sm bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-2 py-1 rounded"
               >
                 {{ recipient.accessCode }}
               </div>
-              <div v-else class="text-gray-400 text-sm">No code</div>
+              <div v-else class="text-gray-400 dark:text-gray-500 text-sm">No code</div>
             </div>
 
             <!-- Status -->
@@ -226,9 +239,9 @@
               <div class="flex flex-col gap-1">
                 <span
                   :class="{
-                    'text-green-600': recipient.accessCodeUsed,
-                    'text-yellow-600': !recipient.accessCodeUsed && recipient.accessCode,
-                    'text-gray-400': !recipient.accessCode,
+                    'text-green-600 dark:text-green-400': recipient.accessCodeUsed,
+                    'text-yellow-600 dark:text-yellow-400': !recipient.accessCodeUsed && recipient.accessCode,
+                    'text-gray-400 dark:text-gray-500': !recipient.accessCode,
                   }"
                   class="text-sm font-medium"
                 >
@@ -238,8 +251,8 @@
                 </span>
                 <span
                   :class="{
-                    'text-green-600': recipient.sendCard,
-                    'text-red-600': !recipient.sendCard,
+                    'text-green-600 dark:text-green-400': recipient.sendCard,
+                    'text-red-600 dark:text-red-400': !recipient.sendCard,
                   }"
                   class="text-xs"
                 >
@@ -253,21 +266,21 @@
               <div class="flex gap-2">
                 <button
                   @click="editRecipient(recipient)"
-                  class="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                  class="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900 rounded"
                   title="Edit recipient"
                 >
                   <i class="pi pi-pencil text-sm"></i>
                 </button>
                 <button
                   @click="regenerateCode(recipient)"
-                  class="p-1 text-green-600 hover:bg-green-50 rounded"
+                  class="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900 rounded"
                   title="Regenerate code"
                 >
                   <i class="pi pi-refresh text-sm"></i>
                 </button>
                 <button
                   @click="deleteRecipient(recipient)"
-                  class="p-1 text-red-600 hover:bg-red-50 rounded"
+                  class="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900 rounded"
                   title="Delete recipient"
                 >
                   <i class="pi pi-trash text-sm"></i>
@@ -314,15 +327,15 @@
       @hide="resetDialog"
     >
       <div class="space-y-4">
-        <!-- Warning banner for international addresses if Geoapify not configured -->
+        <!-- Warning banner for international addresses -->
         <div
-          v-if="!geoapifyValidator.isEnabled() && form.country && !isUSCountry(form.country)"
-          class="bg-yellow-50 border border-yellow-200 rounded-md p-3 flex items-start gap-2"
+          v-if="form.country && !isUSCountry(form.country)"
+          class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-md p-3 flex items-start gap-2"
         >
-          <i class="pi pi-exclamation-triangle text-yellow-600 mt-0.5"></i>
-          <div class="text-sm text-yellow-800">
-            <strong>International address validation not configured.</strong>
-            Address will be saved without validation. To enable validation, set up Geoapify API key.
+          <i class="pi pi-info-circle text-blue-600 dark:text-blue-300 mt-0.5"></i>
+          <div class="text-sm text-blue-800 dark:text-blue-200">
+            <strong>International address validation:</strong>
+            Google Maps Address Validation will be used when you save this address.
           </div>
         </div>
 
@@ -385,7 +398,7 @@
           />
           <div
             v-if="suggestedMailingName && !mailingNameManuallyEdited"
-            class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mt-1 inline-block"
+            class="text-xs text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-900 px-2 py-1 rounded mt-1 inline-block"
           >
             💡 Auto-generating: {{ suggestedMailingName }}
           </div>
@@ -423,44 +436,23 @@
           <div>
             <label class="block text-sm font-medium mb-1">
               Address 1
-              <span v-if="addressSuggestions.length > 0" class="text-xs text-blue-600 ml-2">
-                ({{ addressSuggestions.length }} suggestions)
-              </span>
             </label>
-            <AutoComplete
+            <InputText
               v-model="form.address1"
-              :suggestions="addressSuggestions"
-              @complete="searchAddress"
-              @item-select="onAddressSelect"
-              @change="onAddressChange"
-              :placeholder="
-                geoapifyAutocomplete.isEnabled()
-                  ? 'Start typing address...'
-                  : 'Enter address (autocomplete not configured)'
-              "
-              :showEmptyMessage="false"
-              :minLength="3"
+              placeholder="Enter address"
               class="w-full"
-              optionLabel="formatted"
-            >
-              <template #option="slotProps">
-                <div>{{ slotProps.option.formatted }}</div>
-              </template>
-            </AutoComplete>
-            <div v-if="!geoapifyAutocomplete.isEnabled()" class="text-xs text-orange-600 mt-1">
-              💡 Tip: Set VITE_GEOAPIFY_API_KEY for address autocomplete
-            </div>
+            />
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Address 2</label>
-            <InputText v-model="form.address2" @focus="clearAddressSuggestions" class="w-full" />
+            <InputText v-model="form.address2" class="w-full" />
           </div>
         </div>
 
         <div class="grid grid-cols-4 gap-4">
           <div class="col-span-2">
             <label class="block text-sm font-medium mb-1">City</label>
-            <InputText v-model="form.city" @focus="clearAddressSuggestions" class="w-full" />
+            <InputText v-model="form.city" class="w-full" />
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">State/Province</label>
@@ -483,9 +475,9 @@
           </div>
         </div>
 
-        <div v-if="form.accessCode" class="bg-gray-50 p-3 rounded">
-          <label class="block text-sm font-medium mb-1">Access Code</label>
-          <div class="font-mono text-sm">{{ form.accessCode }}</div>
+        <div v-if="form.accessCode" class="bg-gray-50 dark:bg-gray-700 p-3 rounded">
+          <label class="block text-sm font-medium mb-1 text-gray-900 dark:text-gray-100">Access Code</label>
+          <div class="font-mono text-sm text-gray-900 dark:text-gray-100">{{ form.accessCode }}</div>
         </div>
       </div>
 
@@ -508,7 +500,7 @@
       :style="{ width: '500px' }"
     >
       <div class="space-y-4">
-        <p class="text-sm text-gray-600">
+        <p class="text-sm text-gray-600 dark:text-gray-300">
           Upload an Excel (.xlsx/.xlsm) or CSV file with recipient data. The file should have
           columns for: Title, First Name, Last Name, Address, City, State, ZIP, Send Card.
           <br /><br />
@@ -527,17 +519,17 @@
         />
 
         <div v-if="importPreview.length > 0" class="max-h-60 overflow-y-auto">
-          <h4 class="font-medium mb-2">Preview ({{ importPreview.length }} recipients):</h4>
+          <h4 class="font-medium mb-2 text-gray-900 dark:text-gray-100">Preview ({{ importPreview.length }} recipients):</h4>
           <div class="space-y-1">
             <div
               v-for="(recipient, index) in importPreview.slice(0, 10)"
               :key="index"
-              class="text-sm p-2 bg-gray-50 rounded"
+              class="text-sm p-2 bg-gray-50 dark:bg-gray-700 rounded text-gray-900 dark:text-gray-100"
             >
               {{ recipient.firstName }} {{ recipient.lastName }} - {{ recipient.city }},
               {{ recipient.state }}
             </div>
-            <div v-if="importPreview.length > 10" class="text-sm text-gray-500">
+            <div v-if="importPreview.length > 10" class="text-sm text-gray-500 dark:text-gray-400">
               ... and {{ importPreview.length - 10 }} more
             </div>
           </div>
@@ -574,71 +566,74 @@
     >
       <div class="space-y-4">
         <p class="text-gray-700">
-          {{ isInternationalValidation ? 'Geoapify' : 'USPS' }} returned a standardized version of
-          this address. Which would you like to use?
+          Google Maps Address Validation returned a standardized version of this address. Which would
+          you like to use?
         </p>
 
         <div class="grid grid-cols-2 gap-4">
           <!-- Original Address -->
-          <div class="border rounded p-3 bg-gray-50">
-            <h4 class="font-semibold text-sm text-gray-600 mb-2">Your Address:</h4>
-            <div class="text-sm">
-              <div>{{ originalAddress.address1 }}</div>
-              <div v-if="originalAddress.address2">{{ originalAddress.address2 }}</div>
-              <div>
-                {{ originalAddress.city }}, {{ originalAddress.state }}
-                {{ originalAddress.zipcode }}
+          <div class="border rounded p-3 bg-gray-50 dark:bg-gray-800">
+            <h4 class="font-semibold text-sm text-gray-600 dark:text-gray-300 mb-2">Your Address:</h4>
+            <div class="text-sm text-gray-900 dark:text-gray-100" v-if="originalAddress">
+              <div v-if="originalAddress.address1" class="text-gray-900 dark:text-gray-100">{{ originalAddress.address1 }}</div>
+              <div v-else class="text-gray-400 dark:text-gray-500 italic">(no street address)</div>
+              <div v-if="originalAddress.address2" class="text-gray-900 dark:text-gray-100">{{ originalAddress.address2 }}</div>
+              <div class="text-gray-900 dark:text-gray-100">
+                <template v-if="originalAddress.city || originalAddress.state || originalAddress.zipcode">
+                  <span v-if="originalAddress.city">{{ originalAddress.city }}</span>
+                  <span v-if="originalAddress.city && originalAddress.state">, </span>
+                  <template v-if="originalAddress.state">
+                    {{ originalAddress.state }}
+                    <template v-if="originalAddress.zipcode">&nbsp;</template>
+                  </template>
+                  <span v-if="originalAddress.zipcode">{{ originalAddress.zipcode }}</span>
+                </template>
               </div>
-              <div v-if="originalAddress.country">{{ originalAddress.country }}</div>
+              <div v-if="originalAddress.country" class="text-gray-900 dark:text-gray-100">{{ originalAddress.country }}</div>
             </div>
+            <div v-else class="text-sm text-gray-400 dark:text-gray-500 italic">No address data</div>
           </div>
 
           <!-- Validated Address -->
-          <div class="border rounded p-3 bg-green-50 border-green-300">
-            <h4 class="font-semibold text-sm text-green-700 mb-2">
-              {{ isInternationalValidation ? 'Geoapify' : 'USPS' }} Validated:
+          <div class="border rounded p-3 bg-green-50 dark:bg-green-900 border-green-300 dark:border-green-700">
+            <h4 class="font-semibold text-sm text-green-700 dark:text-green-300 mb-2">
+              Google Maps Validated:
               <span
                 v-if="
-                  isInternationalValidation &&
                   validatedAddressData &&
                   'confidence' in validatedAddressData
                 "
-                class="text-xs font-normal text-gray-600"
+                class="text-xs font-normal text-gray-600 dark:text-gray-400"
               >
                 ({{ Math.round((validatedAddressData.confidence || 0) * 100) }}% confidence)
               </span>
             </h4>
-            <div class="text-sm">
-              <div>{{ validatedAddressData?.address1 }}</div>
-              <div v-if="validatedAddressData?.address2">{{ validatedAddressData?.address2 }}</div>
-              <div>
-                {{ validatedAddressData?.city }}, {{ validatedAddressData?.state }}
-                {{ validatedAddressData?.zipcode
-                }}{{
-                  !isInternationalValidation &&
-                  validatedAddressData &&
-                  'zipPlus4' in validatedAddressData &&
-                  validatedAddressData?.zipPlus4
-                    ? `-${validatedAddressData?.zipPlus4}`
-                    : ''
-                }}
+            <div class="text-sm text-gray-900 dark:text-gray-100" v-if="validatedAddressData">
+              <div v-if="validatedAddressData.address1" class="text-gray-900 dark:text-gray-100">{{ validatedAddressData.address1 }}</div>
+              <div v-else class="text-gray-400 dark:text-gray-500 italic">(no street address)</div>
+              <div v-if="validatedAddressData.address2" class="text-gray-900 dark:text-gray-100">{{ validatedAddressData.address2 }}</div>
+              <div class="text-gray-900 dark:text-gray-100">
+                <template v-if="validatedAddressData.city || validatedAddressData.state || validatedAddressData.zipcode">
+                  <span v-if="validatedAddressData.city">{{ validatedAddressData.city }}</span>
+                  <span v-if="validatedAddressData.city && validatedAddressData.state">, </span>
+                  <template v-if="validatedAddressData.state">
+                    {{ validatedAddressData.state }}
+                    <template v-if="validatedAddressData.zipcode">&nbsp;</template>
+                  </template>
+                  <span v-if="validatedAddressData.zipcode">{{ validatedAddressData.zipcode }}</span>
+                </template>
               </div>
-              <div
-                v-if="
-                  isInternationalValidation &&
-                  validatedAddressData &&
-                  'country' in validatedAddressData
-                "
-              >
-                {{ validatedAddressData?.country }}
+              <div v-if="validatedAddressData.country" class="text-gray-900 dark:text-gray-100">
+                {{ validatedAddressData.country }}
               </div>
             </div>
+            <div v-else class="text-sm text-gray-400 dark:text-gray-500 italic">No validated address data</div>
           </div>
         </div>
 
-        <!-- Show Alternatives Button (only for Geoapify) -->
+        <!-- Show Alternatives Button (if available) -->
         <div
-          v-if="isInternationalValidation && alternativeAddresses.length > 0"
+          v-if="alternativeAddresses.length > 0"
           class="text-center"
         >
           <Button
@@ -651,11 +646,11 @@
 
         <!-- Alternative Addresses List -->
         <div v-if="showAlternatives && alternativeAddresses.length > 0" class="space-y-2">
-          <h4 class="font-semibold text-sm text-gray-700">Other Possible Matches:</h4>
+          <h4 class="font-semibold text-sm text-gray-700 dark:text-gray-200">Other Possible Matches:</h4>
           <div
             v-for="(alt, index) in alternativeAddresses"
             :key="index"
-            class="border rounded p-3 bg-blue-50 border-blue-200 cursor-pointer hover:bg-blue-100 transition-colors"
+            class="border rounded p-3 bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-700 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors text-gray-900 dark:text-gray-100"
             @click="useAlternativeAddress(alt)"
           >
             <div class="flex justify-between items-start">
@@ -665,7 +660,7 @@
                 <div>{{ alt.city }}, {{ alt.state }} {{ alt.zipcode }}</div>
                 <div v-if="alt.country">{{ alt.country }}</div>
               </div>
-              <div class="text-xs text-gray-600 ml-2">
+              <div class="text-xs text-gray-600 dark:text-gray-400 ml-2">
                 {{ Math.round((alt.confidence || 0) * 100) }}%
               </div>
             </div>
@@ -676,7 +671,7 @@
       <template #footer>
         <Button label="Use My Address" class="p-button-outlined" @click="useOriginalAddress" />
         <Button
-          :label="`Use ${isInternationalValidation ? 'Geoapify' : 'USPS'} Address`"
+              :label="`Use Google Maps Address`"
           class="p-button-success"
           @click="useValidatedAddress"
         />
@@ -695,7 +690,7 @@
           <i class="pi pi-exclamation-triangle text-yellow-600 text-3xl"></i>
           <div class="flex-1">
             <p class="text-gray-700 mb-3">
-              {{ isInternationalValidation ? 'Geoapify' : 'USPS' }} could not validate this address:
+              Google Maps could not validate this address:
             </p>
             <div class="border rounded p-3 bg-gray-50 mb-3">
               <div class="text-sm">
@@ -718,8 +713,7 @@
             </div>
             <p class="text-sm text-gray-600">
               This could mean the address doesn't exist, has a typo, or is too new to be in the
-              {{ isInternationalValidation ? 'Geoapify' : 'USPS' }} database. You can save it as
-              entered, or go back and correct it.
+              Google Maps database. You can save it as entered, or go back and correct it.
             </p>
           </div>
         </div>
@@ -758,18 +752,12 @@ import AutoComplete from 'primevue/autocomplete'
 import type { Schema } from '@amplify/data/resource'
 import { generateClient } from 'aws-amplify/api'
 import { generateAccessCode } from '../utils/access-codes.ts'
-import { uspsValidator, type USPSAddress, type USPSValidatedAddress } from '../utils/usps-api.ts'
 import {
-  geoapifyValidator,
-  type GeoapifyAddress,
-  type GeoapifyValidatedAddress,
-} from '../utils/geoapify-validator.ts'
-import { geoapifyAutocomplete, type AddressSuggestion } from '../utils/geoapify-autocomplete.ts'
-import {
-  addresszenValidator,
-  type AddressZenAddress,
-  type AddressZenValidatedAddress,
-} from '../utils/addresszen-validator.ts'
+  googlemapsValidator,
+  type GoogleMapsAddress,
+  type GoogleMapsValidatedAddress,
+} from '../utils/googlemaps-validator.ts'
+import amplifyOutputs from '../../amplify_outputs.json'
 import * as XLSX from 'xlsx'
 
 // Types
@@ -820,6 +808,7 @@ const isEditing = ref(false)
 const selectedRecipients = ref<string[]>([])
 const searchTerm = ref('')
 const statusFilter = ref('all')
+const showInvalidAddressesOnly = ref(false)
 const importPreview = ref<Recipient[]>([])
 const sortField = ref<string>('name')
 const sortDirection = ref<'asc' | 'desc'>('asc')
@@ -828,13 +817,10 @@ const sortDirection = ref<'asc' | 'desc'>('asc')
 const showAddressConfirmDialog = ref(false)
 const showValidationErrorDialog = ref(false)
 const originalAddress = ref<Partial<Recipient>>({})
-const validatedAddressData = ref<
-  USPSValidatedAddress | GeoapifyValidatedAddress | AddressZenValidatedAddress | null
->(null)
-const alternativeAddresses = ref<GeoapifyValidatedAddress[]>([]) // Store alternative matches for Geoapify
+const validatedAddressData = ref<GoogleMapsValidatedAddress | null>(null)
+const alternativeAddresses = ref<GoogleMapsValidatedAddress[]>([]) // Store alternative matches
 const showAlternatives = ref(false) // Toggle to show/hide alternatives
 const skipValidation = ref(false) // Flag to skip validation after user confirms
-const isInternationalValidation = ref(false) // Track if using Geoapify for international
 const validationErrorMessage = ref('')
 const validationErrorAddress = ref<Partial<Recipient>>({})
 
@@ -842,9 +828,7 @@ const validationErrorAddress = ref<Partial<Recipient>>({})
 const mailingNameManuallyEdited = ref(false)
 const suggestedMailingName = ref('')
 
-// Address autocomplete
-const addressSuggestions = ref<AddressSuggestion[]>([])
-let autocompleteAbortController: AbortController | null = null
+// Address autocomplete (removed - using Google Maps validation only)
 
 // Form data
 const form = ref<Partial<Recipient>>({
@@ -873,6 +857,12 @@ const statusOptions = [
   { label: 'No Codes', value: 'nocode' },
   { label: 'Send Cards', value: 'sendcard' },
   { label: 'No Cards', value: 'nocard' },
+  { label: 'Address Valid', value: 'addrvalid' },
+  { label: 'Address Invalid', value: 'addrinvalid' },
+  { label: 'Address Error', value: 'addrerror' },
+  { label: 'Address Queued', value: 'addrqueued' },
+  { label: 'Address Pending', value: 'addrpending' },
+  { label: 'Address Not Validated', value: 'addrnotvalidated' },
 ]
 
 // Title and suffix options for autocomplete
@@ -888,6 +878,7 @@ const codesUnused = computed(
   () => recipients.value.filter((r) => r.accessCode && !r.accessCodeUsed).length,
 )
 const sendCards = computed(() => recipients.value.filter((r) => r.sendCard).length)
+
 
 const filteredRecipients = computed(() => {
   let filtered = recipients.value
@@ -923,6 +914,36 @@ const filteredRecipients = computed(() => {
     case 'nocard':
       filtered = filtered.filter((r) => !r.sendCard)
       break
+    case 'addrvalid':
+      filtered = filtered.filter((r) => r.addressValidationStatus === 'valid')
+      break
+    case 'addrinvalid':
+      filtered = filtered.filter((r) => r.addressValidationStatus === 'invalid')
+      break
+    case 'addrerror':
+      filtered = filtered.filter((r) => r.addressValidationStatus === 'error')
+      break
+    case 'addrqueued':
+      filtered = filtered.filter((r) => r.addressValidationStatus === 'queued')
+      break
+    case 'addrpending':
+      filtered = filtered.filter((r) => r.addressValidationStatus === 'pending')
+      break
+    case 'addrnotvalidated':
+      filtered = filtered.filter(
+        (r) => r.address1 && !r.addressValidationStatus,
+      )
+      break
+  }
+
+  // Filter for invalid/error addresses or no address
+  if (showInvalidAddressesOnly.value) {
+    filtered = filtered.filter(
+      (r) =>
+        !r.address1 || // No address
+        r.addressValidationStatus === 'invalid' ||
+        r.addressValidationStatus === 'error',
+    )
   }
 
   // Sort
@@ -967,7 +988,6 @@ async function fetchRecipients(silentUpdate = false) {
   }
   try {
     if (!silentUpdate) {
-      console.log('Fetching recipients...')
     }
 
     // Fetch all recipients with pagination
@@ -997,9 +1017,7 @@ async function fetchRecipients(silentUpdate = false) {
     } while (nextToken)
 
     if (!silentUpdate) {
-      console.log('Fetched recipients:', allRecipients.length)
       recipients.value = allRecipients
-      console.log('Recipients list updated, count:', recipients.value.length)
     } else {
       // Silent update: only update validation status fields to avoid flickering
       allRecipients.forEach((fetchedRecipient) => {
@@ -1087,26 +1105,18 @@ async function saveRecipient() {
     }
 
     // Auto-validate address if address fields are provided (unless we're skipping validation)
-    // For US addresses, state and city are required. For international, address1 and country are sufficient.
+    // For US addresses, we need city (state can be auto-filled). For international, address1 and country are sufficient.
     const country = form.value.country?.trim().toLowerCase() || ''
     const isUSAddress =
       !country || country === 'usa' || country === 'united states' || country === 'us'
     const hasMinimumAddressInfo =
       form.value.address1?.trim() &&
       (isUSAddress
-        ? form.value.city?.trim() && form.value.state?.trim() // US: need city and state
+        ? form.value.city?.trim() // US: need city (state can be auto-filled from validation)
         : form.value.country?.trim()) // International: just need country
 
     if (!skipValidation.value && hasMinimumAddressInfo) {
-      console.log('📍 Starting address validation...', {
-        address1: form.value.address1,
-        city: form.value.city,
-        state: form.value.state,
-        country: form.value.country,
-        zipcode: form.value.zipcode,
-      })
       const validationResult = await validateAddressBeforeSave()
-      console.log('📍 Validation result:', validationResult)
 
       // If validation returned false, it means user needs to confirm or validation failed
       if (validationResult === false) {
@@ -1114,11 +1124,6 @@ async function saveRecipient() {
         return
       }
       // If validation returned true or null, continue with save
-    } else {
-      console.log('⚠️ Skipping validation:', {
-        skipValidation: skipValidation.value,
-        hasMinimumAddressInfo,
-      })
     }
 
     // Reset skip flag for next save
@@ -1334,7 +1339,6 @@ async function saveRecipient() {
       updatedAt: now,
     }
 
-    console.log('Form data being saved:', recipientData)
 
     if (isEditing.value && form.value.id) {
       // Only include fields that are allowed in UpdateRecipientInput
@@ -1359,9 +1363,7 @@ async function saveRecipient() {
         addressValidatedAt: recipientData.addressValidatedAt || null,
       }
 
-      console.log('Updating existing recipient with data:', updateData)
       const updateResult = await client.models.Recipient.update(updateData)
-      console.log('Recipient update result:', updateResult)
 
       if (updateResult.errors && updateResult.errors.length > 0) {
         console.error('Recipient update errors:', updateResult.errors)
@@ -1371,8 +1373,6 @@ async function saveRecipient() {
           updateResult.errors[0].errorType ||
           JSON.stringify(updateResult.errors[0])
         alert(`Error updating recipient: ${errorMessage}`)
-      } else {
-        console.log('Recipient updated successfully:', updateResult.data)
       }
     } else {
       // Generate access code for new recipients
@@ -1403,9 +1403,7 @@ async function saveRecipient() {
         updatedAt: new Date().toISOString(),
       }
 
-      console.log('Creating recipient with data:', createData)
       const result = await client.models.Recipient.create(createData)
-      console.log('Recipient creation result:', result)
 
       if (result.errors && result.errors.length > 0) {
         console.error('Recipient creation errors:', result.errors)
@@ -1419,7 +1417,6 @@ async function saveRecipient() {
         return
       }
 
-      console.log('Recipient created successfully:', result.data)
 
       // Now update with additional fields that aren't in CreateRecipientInput
       if (result.data && result.data.id) {
@@ -1431,15 +1428,12 @@ async function saveRecipient() {
           updatedAt: now,
         }
 
-        console.log('Updating recipient with additional fields:', updateData)
         const updateResult = await client.models.Recipient.update(updateData)
-        console.log('Recipient update result:', updateResult)
 
         if (updateResult.errors && updateResult.errors.length > 0) {
           console.error('Recipient update errors:', updateResult.errors)
           alert(`Error updating recipient: ${updateResult.errors[0].message || 'Unknown error'}`)
         } else {
-          console.log('Recipient updated successfully:', updateResult.data)
         }
       }
     }
@@ -1513,8 +1507,7 @@ function resetDialog() {
   skipValidation.value = false
   showAddressConfirmDialog.value = false
   showValidationErrorDialog.value = false
-  // Reset autocomplete suggestions
-  addressSuggestions.value = []
+  // Reset autocomplete (removed - using Google Maps validation only)
 }
 
 function toggleAllRecipients() {
@@ -1680,7 +1673,6 @@ function parseExcel(workbook: XLSX.WorkBook) {
     }
   }
 
-  console.log(`📥 Imported ${preview.length} recipients from Excel`)
   importPreview.value = preview
 }
 
@@ -1781,7 +1773,6 @@ async function importRecipients() {
 
     // Queue validation requests for all imported recipients
     if (createdRecipients.length > 0) {
-      console.log(`📮 Queueing ${createdRecipients.length} addresses for background validation...`)
       await queueValidationRequests(createdRecipients)
 
       // Start polling to watch for validation status updates
@@ -1832,71 +1823,24 @@ async function queueValidationRequests(
       country: r.address.country,
     }))
 
-    // Separate US and international addresses for rate limiting
-    // USPS has 60 calls/hour limit, so we need to space them out
-    const usAddresses = requests.filter((r) => {
-      const country = (r.country || '').toLowerCase()
-      return !country || country === 'usa' || country === 'united states' || country === 'us'
-    })
-    const internationalAddresses = requests.filter((r) => {
-      const country = (r.country || '').toLowerCase()
-      return country && country !== 'usa' && country !== 'united states' && country !== 'us'
-    })
-
-    // Send international addresses first (no rate limit)
-    if (internationalAddresses.length > 0) {
-      const batchSize = 50
-      for (let i = 0; i < internationalAddresses.length; i += batchSize) {
-        const batch = internationalAddresses.slice(i, i + batchSize)
-        const response = await fetch(QUEUE_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(batch),
-        })
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(
-            `Failed to queue international batch ${i / batchSize + 1}: ${response.status}`,
-            errorText,
-          )
-        }
-      }
-    }
-
-    // For US addresses, send in batches
-    // Note: The Lambda will handle rate limiting to respect the 60/hour USPS quota
-    if (usAddresses.length > 0) {
-      console.log(
-        `📮 Queueing ${usAddresses.length} US addresses for background validation (will respect 60/hour USPS quota)...`,
-      )
-      // Warn user if there are many US addresses
-      if (usAddresses.length > 50) {
-        alert(
-          `Note: You're importing ${usAddresses.length} US addresses. Due to USPS API quota limits (60 calls/hour), validation may take several hours. International addresses will be validated immediately.`,
+    // Send all addresses to queue (Google Maps handles both US and international)
+    const batchSize = 50
+    for (let i = 0; i < requests.length; i += batchSize) {
+      const batch = requests.slice(i, i + batchSize)
+      const response = await fetch(QUEUE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batch),
+      })
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(
+          `Failed to queue batch ${i / batchSize + 1}: ${response.status}`,
+          errorText,
         )
       }
-
-      const batchSize = 50
-      for (let i = 0; i < usAddresses.length; i += batchSize) {
-        const batch = usAddresses.slice(i, i + batchSize)
-        const response = await fetch(QUEUE_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(batch),
-        })
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(
-            `Failed to queue US batch ${i / batchSize + 1}: ${response.status}`,
-            errorText,
-          )
-        }
-      }
     }
 
-    console.log(
-      `✅ Queued ${recipients.length} addresses for validation (${usAddresses.length} US, ${internationalAddresses.length} international)`,
-    )
   } catch (error) {
     console.error('Error queuing validation requests:', error)
   }
@@ -1943,255 +1887,194 @@ async function removeDuplicates() {
 
 async function validateAddressBeforeSave(): Promise<boolean | null> {
   try {
-    // Determine if this is a US or international address
-    const country = form.value.country?.trim().toLowerCase() || ''
-    const isUSAddress =
-      !country || country === 'usa' || country === 'united states' || country === 'us'
+    // Use Google Maps for both US and international addresses
+    // Ensure Google Maps validator is configured
+    await googlemapsValidator.ensureProxyUrl()
 
-    // Use USPS for US addresses, AddressZen for international
-    if (!isUSAddress) {
-      // International address - use AddressZen (Autocomplete → Resolve flow)
-      console.log('Detected international address, country:', form.value.country)
+    const isEnabled = googlemapsValidator.isEnabled()
+    
+    if (!isEnabled) {
+      const errorMsg =
+        'Google Maps Address Validation is not configured. ' +
+        'Please ensure:\n' +
+        '1. The Amplify backend is deployed (npm run amplify:sandbox)\n' +
+        '2. amplify_outputs.json contains googlemapsProxyUrl\n' +
+        '3. The Google Maps API key is set in SSM Parameter Store (/kellish-yir/googlemaps/api-key)'
 
-      // Ensure proxy URL is loaded before checking
-      await addresszenValidator.ensureProxyUrl()
+      console.error('[Google Maps Error] Configuration missing:', errorMsg)
 
-      if (!addresszenValidator.isEnabled()) {
-        console.warn(
-          '⚠️ AddressZen not configured! Lambda proxy URL not found in amplify_outputs.json. Falling back to Geoapify.',
-        )
-        // Fallback to Geoapify if AddressZen not available
-        if (!geoapifyValidator.isEnabled()) {
-          console.warn(
-            '⚠️ Geoapify also not configured! Set VITE_GEOAPIFY_API_KEY environment variable.',
-          )
-          console.log('Skipping international address validation')
-          return null // Skip validation, proceed with save
-        }
-
-        // Use Geoapify as fallback
-        console.log('Using Geoapify as fallback for international address')
-
-        const address: GeoapifyAddress = {
-          address1: form.value.address1 || '',
-          address2: form.value.address2 || '',
-          city: form.value.city || '',
-          state: form.value.state || '',
-          zipcode: form.value.zipcode || '',
-          country: form.value.country || '',
-        }
-
-        const { primary, alternatives } =
-          await geoapifyValidator.validateAddressWithAlternatives(address)
-        isInternationalValidation.value = true
-
-        console.log('Geoapify validation result:', primary)
-        console.log('Geoapify alternatives count (raw):', alternatives.length)
-
-        // Filter out alternatives that are identical to the primary result
-        const uniqueAlternatives = alternatives.filter((alt) => {
-          return (
-            alt.address1.toLowerCase() !== primary.address1.toLowerCase() ||
-            alt.city.toLowerCase() !== primary.city.toLowerCase() ||
-            alt.state.toLowerCase() !== primary.state.toLowerCase() ||
-            alt.zipcode !== primary.zipcode
-          )
-        })
-
-        console.log('Geoapify alternatives count (unique):', uniqueAlternatives.length)
-
-        // Only keep alternatives that have minimum confidence (10% or higher)
-        const usefulAlternatives = uniqueAlternatives.filter((alt) => (alt.confidence || 0) >= 0.1)
-
-        console.log('Geoapify alternatives with meaningful confidence:', usefulAlternatives.length)
-
-        if (primary.error) {
-          // Validation failed, show error dialog
-          validationErrorMessage.value = primary.error
-          validationErrorAddress.value = { ...form.value }
-          showValidationErrorDialog.value = true
-          return false // Pause save until user decides
-        }
-
-        // Check if we got a result (even with low confidence)
-        if (primary.standardized) {
-          // Check if address is different
-          const isDifferent =
-            primary.address1.toLowerCase() !== address.address1.toLowerCase() ||
-            primary.city.toLowerCase() !== address.city.toLowerCase() ||
-            primary.state.toLowerCase() !== address.state.toLowerCase() ||
-            primary.zipcode !== address.zipcode
-
-          if (isDifferent || usefulAlternatives.length > 0) {
-            // Store both addresses and useful alternatives, show confirmation dialog
-            // Only show alternatives section if there are alternatives with meaningful confidence
-            originalAddress.value = { ...form.value }
-            validatedAddressData.value = primary
-            alternativeAddresses.value = usefulAlternatives
-            showAlternatives.value = usefulAlternatives.length > 0 // Auto-show alternatives if available
-            showAddressConfirmDialog.value = true
-            return false // Pause save until user confirms
-          } else if (primary.confidence >= 0.5) {
-            // Address is valid, matches, and has good confidence - mark as validated
-            form.value.addressValidationStatus = 'valid'
-            form.value.addressValidationMessage = 'Verified by Geoapify'
-            form.value.addressValidatedAt = new Date().toISOString()
-          }
-        }
-
-        // No suggestions or address matches with low confidence, continue with save
-        return null
-      }
-
-      console.log('Using AddressZen to validate international address (Autocomplete → Resolve)')
-
-      const address: AddressZenAddress = {
-        address1: form.value.address1 || '',
-        address2: form.value.address2 || '',
-        city: form.value.city || '',
-        state: form.value.state || '',
-        zipcode: form.value.zipcode || '',
-        country: form.value.country || '',
-      }
-
-      const primary = await addresszenValidator.validateAddress(address)
-      isInternationalValidation.value = true
-
-      console.log('AddressZen validation result (International):', primary)
-
-      if (primary.error) {
-        // Validation failed, show error dialog
-        validationErrorMessage.value = primary.error
-        validationErrorAddress.value = { ...form.value }
-        showValidationErrorDialog.value = true
-        return false // Pause save until user decides
-      }
-
-      // Check if we got a result
-      if (primary.standardized) {
-        // Check if address is different
-        const isDifferent =
-          primary.address1.toLowerCase() !== address.address1.toLowerCase() ||
-          (primary.city || '').toLowerCase() !== (address.city || '').toLowerCase() ||
-          (primary.state || '').toLowerCase() !== (address.state || '').toLowerCase() ||
-          primary.zipcode !== address.zipcode ||
-          (primary.country || '').toLowerCase() !== (address.country?.toLowerCase() || '')
-
-        if (isDifferent) {
-          // Store both addresses and show confirmation dialog
-          originalAddress.value = { ...form.value }
-          validatedAddressData.value = primary
-          alternativeAddresses.value = [] // AddressZen doesn't currently support alternatives in this flow
-          showAlternatives.value = false
-          showAddressConfirmDialog.value = true
-          return false // Pause save until user confirms
-        } else {
-          // Address is valid, matches - mark as validated
-          form.value.addressValidationStatus = 'valid'
-          form.value.addressValidationMessage = 'Verified by AddressZen'
-          form.value.addressValidatedAt = new Date().toISOString()
-        }
-      } else if (primary.deliverable) {
-        // Address is deliverable - mark as valid
-        form.value.addressValidationStatus = 'valid'
-        form.value.addressValidationMessage = 'Verified by AddressZen'
-        form.value.addressValidatedAt = new Date().toISOString()
-      }
-
-      // No suggestions or address matches with low confidence, continue with save
-      return null
+      validationErrorMessage.value = errorMsg
+      validationErrorAddress.value = { ...form.value }
+      showValidationErrorDialog.value = true
+      return false // Block save - configuration must be fixed
     }
 
-    // US address - use USPS
-    isInternationalValidation.value = false
-
-    // Strip ZIP+4 to just 5 digits for USPS API (they'll add it back)
-    let zipcode = form.value.zipcode || ''
-    if (zipcode.includes('-')) {
-      zipcode = zipcode.split('-')[0]
-    }
-
-    const address: USPSAddress = {
+    const address: GoogleMapsAddress = {
       address1: form.value.address1 || '',
       address2: form.value.address2 || '',
       city: form.value.city || '',
       state: form.value.state || '',
-      zipcode: zipcode,
+      zipcode: form.value.zipcode || '',
+      country: form.value.country || '',
     }
 
-    const result = await uspsValidator.validateAddress(address)
+    const result = await googlemapsValidator.validateAddress(address)
 
     if (result.error) {
-      // Check if it's a quota exceeded error
-      const isQuotaExceeded =
-        result.error.toLowerCase().includes('quota') ||
-        result.error.toLowerCase().includes('exceeded') ||
-        result.error.toLowerCase().includes('rate limit') ||
-        result.error.toLowerCase().includes('too many')
+      // Validation failed - show detailed error
+      // Check if error message already includes "Google Maps validation failed" to avoid duplication
+      const baseError = result.error.includes('Google Maps validation failed') 
+        ? result.error 
+        : `Google Maps validation failed: ${result.error}`
+      
+      const detailedError = 
+        `${baseError}\n\n` +
+        `Address attempted: ${address.address1}, ${address.city}, ${address.state}, ${address.zipcode}, ${address.country}\n\n` +
+        `This may be due to:\n` +
+        `- Address not found in Google Maps database\n` +
+        `- API key issues (check SSM parameter /kellish-yir/googlemaps/api-key)\n` +
+        `- Address Validation API not enabled in Google Cloud Console\n` +
+        `- Billing not set up for Google Cloud project\n` +
+        `- Network/connectivity issues\n` +
+        `- Invalid address format`
 
-      if (isQuotaExceeded) {
-        validationErrorMessage.value =
-          'USPS API quota exceeded (60 calls/hour limit). The address has been saved, but validation will be processed in the background. You can edit and validate again later when the quota resets.'
-        // Allow save without validation - background validation will handle it later
-        form.value.addressValidationStatus = 'queued'
-        form.value.addressValidationMessage = 'Queued for background validation (quota exceeded)'
-        return null // Continue with save
-      } else {
-        // Other validation errors - show error dialog
-        validationErrorMessage.value = result.error
-        validationErrorAddress.value = { ...form.value }
-        showValidationErrorDialog.value = true
-        return false // Pause save until user decides
-      }
+      console.error('[Google Maps Error] Validation failed:', {
+        error: result.error,
+        address,
+        result,
+      })
+
+      validationErrorMessage.value = detailedError
+      validationErrorAddress.value = { ...form.value }
+      showValidationErrorDialog.value = true
+      return false // Pause save until user decides
     }
 
-    if (result.standardized) {
-      // Address was standardized by USPS (may or may not be deliverable)
-      // Check if address is different
-      const zipDifferent = result.zipcode && result.zipcode !== address.zipcode
+    // Check if we got a standardized result
+    if (result.standardized || result.deliverable) {
+      // Normalize zipcodes for comparison (handle empty vs null vs value)
+      const normalizedResultZipcode = (result.zipcode || '').trim()
+      const normalizedFormZipcode = (address.zipcode || '').trim()
+      
+      // Auto-fill missing zipcode if Google provides one
+      if (normalizedResultZipcode && !normalizedFormZipcode) {
+        form.value.zipcode = normalizedResultZipcode
+      }
+      
+      // Normalize addresses for comparison
+      // Combine address1 + address2 for both form and result to handle cases where
+      // Google combines apartment numbers into address1
+      const normalizeAddressLine = (addr1: string, addr2?: string): string => {
+        const combined = `${addr1 || ''} ${addr2 || ''}`.trim()
+        // Normalize apartment number variations (APT, Apt, apt, #, etc.)
+        // Keep the apartment number but normalize the prefix
+        // Note: We don't normalize street type abbreviations (Ave vs Avenue) because
+        // Google's abbreviations are intentional standardization recommendations
+        return combined
+          .toLowerCase()
+          .replace(/\b(apt|apartment|unit|ste|suite)\s*/gi, '') // Remove prefix, keep number
+          .replace(/#\s*/g, '') // Remove # symbol
+          .replace(/\s+/g, ' ') // Normalize whitespace
+          .trim()
+      }
+      
+      const normalizedFormAddress = normalizeAddressLine(
+        address.address1 || '',
+        address.address2
+      )
+      const normalizedResultAddress = normalizeAddressLine(
+        result.address1 || '',
+        result.address2
+      )
+      
+      // Normalize city, state, and country for comparison (handle case and whitespace)
+      const normalizeText = (text: string | null | undefined): string => {
+        return (text || '').toLowerCase().trim().replace(/\s+/g, ' ')
+      }
+      
+      const normalizedFormCity = normalizeText(address.city)
+      const normalizedResultCity = normalizeText(result.city)
+      const normalizedFormState = normalizeText(address.state)
+      const normalizedResultState = normalizeText(result.state)
+      const normalizedFormCountry = normalizeText(address.country)
+      const normalizedResultCountry = normalizeText(result.country)
+      
+      // Check if address is different (ignoring zipcode if it was just auto-filled)
       const isDifferent =
-        result.address1.toLowerCase() !== address.address1.toLowerCase() ||
-        result.city.toLowerCase() !== address.city.toLowerCase() ||
-        result.state.toLowerCase() !== address.state.toLowerCase() ||
-        zipDifferent ||
-        (result.zipPlus4 && address.zipcode && !address.zipcode.includes(result.zipPlus4))
+        normalizedFormAddress !== normalizedResultAddress ||
+        normalizedFormCity !== normalizedResultCity ||
+        normalizedFormState !== normalizedResultState ||
+        // Only compare zipcode if both are present
+        (normalizedFormZipcode && normalizedResultZipcode && normalizedResultZipcode !== normalizedFormZipcode) ||
+        normalizedFormCountry !== normalizedResultCountry
 
       if (isDifferent) {
         // Store both addresses and show confirmation dialog
-        originalAddress.value = { ...form.value }
+        // Store original address with proper structure
+        originalAddress.value = {
+          address1: address.address1 || form.value.address1 || '',
+          address2: address.address2 || form.value.address2 || '',
+          city: address.city || form.value.city || '',
+          state: address.state || form.value.state || '',
+          zipcode: address.zipcode || form.value.zipcode || '',
+          country: address.country || form.value.country || '',
+        }
         validatedAddressData.value = result
+        alternativeAddresses.value = result.alternatives || []
+        showAlternatives.value = alternativeAddresses.value.length > 0
+        
         showAddressConfirmDialog.value = true
         return false // Pause save until user confirms
       } else {
-        // Address is standardized and matches - mark as validated
+        // Address is valid, matches - update any missing fields and mark as validated
+        if (normalizedResultZipcode && !normalizedFormZipcode) {
+          form.value.zipcode = normalizedResultZipcode
+        }
+        if (result.state && !form.value.state?.trim()) {
+          form.value.state = result.state
+        }
+        if (result.city && !form.value.city?.trim()) {
+          form.value.city = result.city
+        }
+        if (result.country && !form.value.country) {
+          form.value.country = result.country
+        }
+        
         form.value.addressValidationStatus = result.deliverable ? 'valid' : 'invalid'
         form.value.addressValidationMessage = result.deliverable
-          ? 'Verified by USPS'
-          : 'Standardized by USPS (not deliverable)'
+          ? 'Verified by Google Maps'
+          : 'Standardized by Google Maps (not deliverable)'
         form.value.addressValidatedAt = new Date().toISOString()
       }
     } else if (result.deliverable) {
-      // Address is deliverable but not standardized - mark as valid
+      // Address is deliverable but not standardized - update missing fields and mark as valid
+      if (result.zipcode && !form.value.zipcode?.trim()) {
+        form.value.zipcode = result.zipcode
+      }
+      if (result.state && !form.value.state?.trim()) {
+        form.value.state = result.state
+      }
+      if (result.city && !form.value.city?.trim()) {
+        form.value.city = result.city
+      }
+      if (result.country && !form.value.country) {
+        form.value.country = result.country
+      }
+      
       form.value.addressValidationStatus = 'valid'
-      form.value.addressValidationMessage = 'Verified by USPS'
+      form.value.addressValidationMessage = 'Verified by Google Maps'
       form.value.addressValidatedAt = new Date().toISOString()
-    }
-
-    // Address is valid - set country to USA if not specified
-    if (result.deliverable && !form.value.country) {
-      form.value.country = 'United States'
     }
 
     // Address is valid and same, continue with save
     return null
   } catch (err) {
     console.error('Error validating address:', err)
-    // Show error dialog with exception details
     validationErrorMessage.value =
       err instanceof Error ? err.message : 'Unknown error occurred during validation'
     validationErrorAddress.value = { ...form.value }
     showValidationErrorDialog.value = true
-    return false // Pause save until user decides
+    return false
   }
 }
 
@@ -2202,31 +2085,13 @@ function useValidatedAddress() {
     form.value.city = validatedAddressData.value.city
     form.value.state = validatedAddressData.value.state
 
-    // Handle zipcode differently for USPS vs Geoapify/AddressZen
-    if (isInternationalValidation.value) {
-      // Geoapify or AddressZen result
+    // Handle validated address (Google Maps)
+    if (validatedAddressData.value) {
       form.value.zipcode = validatedAddressData.value.zipcode
-      if ('country' in validatedAddressData.value) {
+      if (validatedAddressData.value.country) {
         form.value.country = validatedAddressData.value.country
       }
-      // Determine which service was used
-      const isAddressZen =
-        'countryCode' in validatedAddressData.value &&
-        !(
-          'countryCode' in validatedAddressData.value &&
-          (validatedAddressData.value as GeoapifyValidatedAddress).countryCode?.length === 0 &&
-          'formatted' in validatedAddressData.value &&
-          (validatedAddressData.value as GeoapifyValidatedAddress).formatted
-        )
-      form.value.addressValidationMessage = isAddressZen
-        ? 'Verified by AddressZen'
-        : 'Verified by Geoapify'
-    } else {
-      // USPS result
-      const uspsData = validatedAddressData.value as USPSValidatedAddress
-      const newZipcode = uspsData.zipcode + (uspsData.zipPlus4 ? `-${uspsData.zipPlus4}` : '')
-      form.value.zipcode = newZipcode
-      form.value.addressValidationMessage = 'Verified by USPS'
+      form.value.addressValidationMessage = 'Verified by Google Maps'
     }
 
     // Mark address as validated
@@ -2239,7 +2104,7 @@ function useValidatedAddress() {
   saveRecipient()
 }
 
-function useAlternativeAddress(alt: GeoapifyValidatedAddress) {
+function useAlternativeAddress(alt: GoogleMapsValidatedAddress) {
   // Use the selected alternative address
   form.value.address1 = alt.address1
   form.value.address2 = alt.address2 || ''
@@ -2252,7 +2117,7 @@ function useAlternativeAddress(alt: GeoapifyValidatedAddress) {
 
   // Mark address as validated (user chose an alternative)
   form.value.addressValidationStatus = 'valid'
-  form.value.addressValidationMessage = `Validated by Geoapify (${Math.round((alt.confidence || 0) * 100)}% confidence)`
+  form.value.addressValidationMessage = `Validated by Google Maps (${Math.round((alt.confidence || 0) * 100)}% confidence)`
   form.value.addressValidatedAt = new Date().toISOString()
 
   showAddressConfirmDialog.value = false
@@ -2296,7 +2161,7 @@ function cancelValidationError() {
 function cleanErrorMessage(error: string): string {
   // Try to extract the actual error message from JSON/API responses
 
-  // Pattern 1: Extract "message" from USPS JSON error
+  // Pattern 1: Extract error message from JSON
   const messageMatch = error.match(/"message":\s*"([^"]+)"/)
   if (messageMatch && messageMatch[1]) {
     const message = messageMatch[1]
@@ -2331,7 +2196,7 @@ function cleanErrorMessage(error: string): string {
 
   // Pattern 2: Look for specific error codes
   if (error.includes('Address Not Found') || error.includes('010005')) {
-    return 'Address Not Found. The USPS database does not have a record of this address. Please verify the address is correct.'
+    return 'Address Not Found. The address could not be validated. Please verify the address is correct.'
   }
 
   if (error.includes('Invalid ZIP')) {
@@ -2342,7 +2207,7 @@ function cleanErrorMessage(error: string): string {
     return 'Insufficient Address Information. Required address fields are missing (street, city, state, or ZIP).'
   }
 
-  // Pattern 3: Geoapify errors
+  // Pattern 3: General API errors
   if (error.includes('not found or could not be validated')) {
     return 'Address Not Found. This address could not be located in the geocoding database.'
   }
@@ -2404,110 +2269,18 @@ function generateMailingNameFromRecipient(recipient: Partial<Recipient>): string
   return parts.join(' ')
 }
 
-// Address autocomplete functions
+// Address autocomplete functions (removed - using Google Maps validation only)
 function clearAddressSuggestions() {
-  // Clear suggestions immediately when moving to another field
-  // This prevents the dropdown from covering other fields
-  addressSuggestions.value = []
-
-  // Abort any pending autocomplete requests
-  if (autocompleteAbortController) {
-    autocompleteAbortController.abort()
-    autocompleteAbortController = null
-  }
+  // No-op - autocomplete removed
 }
 
 async function searchAddress(event: { query: string }) {
-  const query = event.query?.trim()
-
-  console.log('searchAddress called with query:', query)
-
-  // Cancel any previous request
-  if (autocompleteAbortController) {
-    autocompleteAbortController.abort()
-  }
-
-  if (!query || query.length < 3) {
-    addressSuggestions.value = []
-    return
-  }
-
-  // Check if Geoapify is enabled
-  if (!geoapifyAutocomplete.isEnabled()) {
-    console.warn(
-      'Geoapify autocomplete is not enabled. Set VITE_GEOAPIFY_API_KEY environment variable.',
-    )
-    addressSuggestions.value = []
-    return
-  }
-
-  // Create new abort controller for this request
-  autocompleteAbortController = new AbortController()
-  const currentController = autocompleteAbortController
-
-  // Use country filter if specified
-  const countryFilter = form.value.country || undefined
-
-  try {
-    console.log('Fetching address suggestions for:', query, 'country:', countryFilter)
-    const suggestions = await geoapifyAutocomplete.getSuggestions(query, countryFilter)
-
-    // Only update suggestions if this request wasn't aborted
-    if (currentController === autocompleteAbortController) {
-      console.log('Received suggestions:', suggestions)
-      addressSuggestions.value = suggestions
-    }
-  } catch (error) {
-    // Ignore abort errors
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.log('Autocomplete request aborted')
-      return
-    }
-    console.error('Error fetching address suggestions:', error)
-    addressSuggestions.value = []
-  }
+  // No-op - autocomplete removed (Google Maps validation is used instead)
 }
 
-function onAddressSelect(event: { value: AddressSuggestion }) {
-  console.log('onAddressSelect called with event:', event)
-  const suggestion = event.value
-  console.log('Suggestion value:', suggestion)
+// Address autocomplete removed - using Google Maps validation only
 
-  if (!suggestion) {
-    console.warn('No suggestion provided')
-    return
-  }
-
-  // Auto-fill all address fields from the selected suggestion
-  form.value.address1 = suggestion.address1 || ''
-  form.value.address2 = suggestion.address2 || ''
-  form.value.city = suggestion.city || ''
-  form.value.state = suggestion.state || ''
-  form.value.zipcode = suggestion.zipcode || ''
-  form.value.country = suggestion.country || ''
-
-  console.log('Address auto-filled from suggestion:', {
-    address1: form.value.address1,
-    city: form.value.city,
-    state: form.value.state,
-    zipcode: form.value.zipcode,
-    country: form.value.country,
-  })
-
-  // Clear suggestions after selection
-  addressSuggestions.value = []
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function onAddressChange(event: any) {
-  console.log('onAddressChange called with event:', event)
-
-  // Check if the value is an object (a suggestion was selected)
-  if (event.value && typeof event.value === 'object') {
-    console.log('Change detected - calling onAddressSelect')
-    onAddressSelect({ value: event.value })
-  }
-}
+// Address autocomplete removed - using Google Maps validation only
 
 // Update mailing name suggestion as user types
 function updateMailingName() {
@@ -2565,7 +2338,6 @@ function startValidationPolling() {
   )
 
   if (hasQueuedValidations && !pollingInterval) {
-    console.log('📡 Starting validation status polling...')
     pollingInterval = window.setInterval(() => {
       fetchRecipients(true).then(() => {
         // Stop polling if no more queued validations
@@ -2574,7 +2346,6 @@ function startValidationPolling() {
             r.address1 && (!r.addressValidationStatus || r.addressValidationStatus === 'queued'),
         )
         if (!stillQueued && pollingInterval) {
-          console.log('✅ All validations complete, stopping polling')
           window.clearInterval(pollingInterval)
           pollingInterval = null
         }

@@ -21,6 +21,7 @@ interface AddressZenRequest {
     country?: string
   }
   query?: string // For autocomplete
+  country?: string // Country filter for autocomplete
   placeId?: string // For resolve (from autocomplete suggestion)
 }
 
@@ -116,7 +117,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
         }
       }
 
-      const suggestions = await autocompleteAddress(request.query, apiKey)
+      const suggestions = await autocompleteAddress(request.query, apiKey, request.country)
       return {
         statusCode: 200,
         headers,
@@ -341,15 +342,30 @@ interface AddressZenAutocompleteResponse {
  * Autocomplete address using AddressZen Autocomplete API
  * Reference: AddressZen Address Autocomplete API
  * Endpoint: GET https://api.addresszen.com/v1/autocomplete/addresses?api_key=...&q=...
+ * 
+ * Note: AddressZen may support country filtering via query parameter or in the query string itself
+ * If country is provided, we include it in the query to help AddressZen filter results
  */
 async function autocompleteAddress(
   query: string,
   apiKey: string,
+  country?: string,
 ): Promise<AddressZenAutocompleteResponse> {
   try {
-    const url = `https://api.addresszen.com/v1/autocomplete/addresses?api_key=${apiKey}&q=${encodeURIComponent(query)}`
+    // Build URL with country if provided
+    // AddressZen might support country filtering via query parameter or by including it in the query
+    let url = `https://api.addresszen.com/v1/autocomplete/addresses?api_key=${apiKey}&q=${encodeURIComponent(query)}`
+    
+    // If country is specified and not already in query, try adding it as a filter
+    // Note: Check AddressZen docs for actual country filter parameter name
+    if (country && !query.toLowerCase().includes(country.toLowerCase())) {
+      // Try adding country to query string to help filter results
+      // Some APIs support country code like "country=DE" or similar
+      // For now, we'll include it in the query text itself
+      url = `https://api.addresszen.com/v1/autocomplete/addresses?api_key=${apiKey}&q=${encodeURIComponent(query + ' ' + country)}`
+    }
 
-    console.log('Autocomplete address with AddressZen:', query)
+    console.log('[AddressZen Debug] Autocomplete address with AddressZen:', { query, country, url })
 
     const response = await fetch(url, {
       method: 'GET',
@@ -364,7 +380,22 @@ async function autocompleteAddress(
     }
 
     const data = await response.json()
-    console.log('AddressZen Autocomplete API response:', JSON.stringify(data, null, 2))
+    console.log('[AddressZen Debug] Autocomplete API raw response:', JSON.stringify(data, null, 2))
+    
+    // Log response structure for debugging
+    if (data.result) {
+      console.log('[AddressZen Debug] Response has result property')
+      if (data.result.hits) {
+        console.log('[AddressZen Debug] result.hits type:', Array.isArray(data.result.hits) ? 'array' : typeof data.result.hits, 'length:', Array.isArray(data.result.hits) ? data.result.hits.length : 'N/A')
+      }
+      if (typeof data.result === 'object') {
+        console.log('[AddressZen Debug] result keys:', Object.keys(data.result))
+      }
+    } else {
+      console.log('[AddressZen Debug] Response does not have result property')
+      console.log('[AddressZen Debug] Response keys:', Object.keys(data))
+    }
+    
     return data
   } catch (error) {
     console.error('Error autocompleting address:', error)

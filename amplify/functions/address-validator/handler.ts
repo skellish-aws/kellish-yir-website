@@ -2,7 +2,7 @@
  * Address Validator Lambda Function
  *
  * Processes address validation requests from SQS queue
- * Validates addresses using USPS (US) or Geoapify (International)
+ * Validates addresses using Google Maps Address Validation API (both US and international)
  * Updates recipient records in DynamoDB with validation results
  */
 
@@ -26,7 +26,7 @@ async function getRecipientTableName(): Promise<string> {
   // List tables and find the one starting with "Recipient-"
   const listCommand = new ListTablesCommand({})
   const response = await dynamoClient.send(listCommand)
-  const tableName = response.TableNames?.find((name) => name.startsWith('Recipient-'))
+  const tableName = response.TableNames?.find((name: string) => name.startsWith('Recipient-'))
 
   if (!tableName) {
     throw new Error('Recipient table not found')
@@ -36,10 +36,8 @@ async function getRecipientTableName(): Promise<string> {
   return tableName
 }
 
-// Cache API keys for reuse across invocations
-let cachedUspsConsumerKey: string | null = null
-let cachedUspsConsumerSecret: string | null = null
-let cachedGeoapifyApiKey: string | null = null
+// Cache API key for reuse across invocations
+let cachedGoogleMapsApiKey: string | null = null
 
 interface AddressValidationRequest {
   recipientId: string
@@ -65,66 +63,274 @@ interface ValidationResult {
 }
 
 /**
- * Get API keys from SSM Parameter Store
+ * Get Google Maps API key from SSM Parameter Store
  */
-async function getApiKeys(): Promise<{
-  uspsConsumerKey: string
-  uspsConsumerSecret: string
-  geoapifyApiKey: string
-}> {
-  // Return cached values if available
-  if (cachedUspsConsumerKey && cachedUspsConsumerSecret && cachedGeoapifyApiKey) {
-    return {
-      uspsConsumerKey: cachedUspsConsumerKey,
-      uspsConsumerSecret: cachedUspsConsumerSecret,
-      geoapifyApiKey: cachedGeoapifyApiKey,
-    }
+async function getGoogleMapsApiKey(): Promise<string> {
+  if (cachedGoogleMapsApiKey) {
+    return cachedGoogleMapsApiKey
   }
 
   try {
-    // Fetch all parameters in parallel
-    const [uspsKeyResponse, uspsSecretResponse, geoapifyResponse] = await Promise.all([
-      ssmClient.send(
-        new GetParameterCommand({
-          Name: '/kellish-yir/usps/consumer-key',
-          WithDecryption: true,
-        }),
-      ),
-      ssmClient.send(
-        new GetParameterCommand({
-          Name: '/kellish-yir/usps/consumer-secret',
-          WithDecryption: true,
-        }),
-      ),
-      ssmClient.send(
-        new GetParameterCommand({
-          Name: '/kellish-yir/geoapify/api-key',
-          WithDecryption: true,
-        }),
-      ),
-    ])
+    const response = await ssmClient.send(
+      new GetParameterCommand({
+        Name: '/kellish-yir/googlemaps/api-key',
+        WithDecryption: true,
+      }),
+    )
 
-    cachedUspsConsumerKey = uspsKeyResponse.Parameter?.Value || ''
-    cachedUspsConsumerSecret = uspsSecretResponse.Parameter?.Value || ''
-    cachedGeoapifyApiKey = geoapifyResponse.Parameter?.Value || ''
+    cachedGoogleMapsApiKey = response.Parameter?.Value || ''
 
-    if (!cachedUspsConsumerKey || !cachedUspsConsumerSecret || !cachedGeoapifyApiKey) {
-      throw new Error('One or more API keys not found in SSM Parameter Store')
+    if (!cachedGoogleMapsApiKey) {
+      throw new Error('Google Maps API key not found in SSM Parameter Store')
+    }
+
+    return cachedGoogleMapsApiKey
+  } catch (error) {
+    console.error('Error getting Google Maps API key from SSM:', error)
+    throw new Error('Failed to retrieve Google Maps API key from SSM Parameter Store')
+  }
+}
+
+/**
+ * Map country name to ISO 3166-1 alpha-2 code
+ */
+function mapCountryToCode(country: string): string | null {
+  const countryLower = country.toLowerCase().trim()
+  
+  const countryMap: Record<string, string> = {
+    'united states': 'US',
+    'usa': 'US',
+    'us': 'US',
+    'germany': 'DE',
+    'deutschland': 'DE',
+    'united kingdom': 'GB',
+    'uk': 'GB',
+    'great britain': 'GB',
+    'canada': 'CA',
+    'france': 'FR',
+    'australia': 'AU',
+    'japan': 'JP',
+    'mexico': 'MX',
+    'spain': 'ES',
+    'italy': 'IT',
+    'netherlands': 'NL',
+    'belgium': 'BE',
+    'switzerland': 'CH',
+    'austria': 'AT',
+    'sweden': 'SE',
+    'norway': 'NO',
+    'denmark': 'DK',
+    'finland': 'FI',
+    'poland': 'PL',
+    'portugal': 'PT',
+    'greece': 'GR',
+    'ireland': 'IE',
+    'new zealand': 'NZ',
+  }
+
+  // Check direct match
+  if (countryMap[countryLower]) {
+    return countryMap[countryLower]
+  }
+
+  // Check if it's already a 2-letter code
+  if (country.length === 2 && /^[A-Z]{2}$/i.test(country)) {
+    return country.toUpperCase()
+  }
+
+  return null
+}
+
+/**
+ * Format address for Google Maps Address Validation API
+ */
+function formatAddressForGoogleMaps(address: AddressValidationRequest): any {
+  const formatted: any = {
+    addressLines: [],
+  }
+
+  if (address.address1) {
+    formatted.addressLines.push(address.address1)
+  }
+  if (address.address2) {
+    formatted.addressLines.push(address.address2)
+  }
+
+  if (address.city) {
+    formatted.locality = address.city
+  }
+
+  if (address.state) {
+    formatted.administrativeArea = address.state
+  }
+
+  if (address.zipcode) {
+    formatted.postalCode = address.zipcode
+  }
+
+  // Region code (ISO 3166-1 alpha-2) - convert country name to code if needed
+  if (address.country) {
+    const countryCode = mapCountryToCode(address.country)
+    if (countryCode) {
+      formatted.regionCode = countryCode
+    }
+  }
+
+  return formatted
+}
+
+/**
+ * Validate address using Google Maps Address Validation API
+ */
+async function validateGoogleMapsAddress(
+  request: AddressValidationRequest,
+): Promise<ValidationResult> {
+  try {
+    const apiKey = await getGoogleMapsApiKey()
+
+    // Determine if this is a US address for CASS enablement
+    const requestCountry = (request.country || '').toLowerCase()
+    const isUSAddress = 
+      !requestCountry || 
+      requestCountry === 'us' || 
+      requestCountry === 'usa' || 
+      requestCountry === 'united states'
+
+    // Format address for Google Maps API
+    const formattedAddress = formatAddressForGoogleMaps(request)
+
+    // Build Google Maps API request
+    const googleMapsRequest = {
+      address: formattedAddress,
+      enableUspsCass: isUSAddress, // Enable CASS for US addresses
+    }
+
+
+    // Call Google Maps Address Validation API
+    const response = await fetch(
+      `https://addressvalidation.googleapis.com/v1:validateAddress?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(googleMapsRequest),
+      },
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[Google Maps Error] API error:', response.status, errorText)
+      return {
+        status: 'invalid',
+        message: `Google Maps validation failed: ${response.status} ${errorText}`,
+      }
+    }
+
+    const data = await response.json()
+
+    if (!data.result) {
+      return {
+        status: 'invalid',
+        message: 'Address validation failed - no result from Google Maps',
+      }
+    }
+
+    const result = data.result
+    const verdict = result.verdict || {}
+    const postalAddress = result.address?.postalAddress || {}
+
+    // Determine if address is deliverable
+    // SUB_PREMISE means apartment/unit - this is deliverable!
+    // Only 'OTHER' granularity means not deliverable
+    // For international addresses, we rely on addressComplete and validationGranularity
+    const deliverable =
+      verdict.addressComplete === true &&
+      verdict.validationGranularity !== 'OTHER'
+    
+    // Also check USPS DPV confirmation if available (more reliable for US addresses)
+    const uspsData = result.uspsData
+    // USPS DPV confirmation codes:
+    // "Y" = Confirmed deliverable
+    // "D" = Confirmed with Drop (also deliverable)
+    // "S" = Confirmed at Street level (also deliverable)
+    // "N" = Not deliverable
+    const dpvConfirmation = uspsData?.dpvConfirmation
+    const uspsDeliverable = dpvConfirmation === 'Y' || dpvConfirmation === 'D' || dpvConfirmation === 'S'
+    const uspsNotDeliverable = dpvConfirmation === 'N'
+    
+    // For US addresses: use USPS confirmation if clear, otherwise fall back to Google Maps verdict
+    // For international addresses: use Google Maps verdict (USPS data won't exist)
+    const isDeliverable = uspsData !== undefined 
+      ? (uspsNotDeliverable ? false : (uspsDeliverable ? true : deliverable)) // US address: use USPS if clear, else Google Maps
+      : deliverable // International address: use Google Maps verdict
+    
+
+    // Extract address components
+    const addressLines = postalAddress.addressLines || []
+    const address1 = addressLines[0] || request.address1 || ''
+    const address2 = addressLines[1] || request.address2 || ''
+    const city = postalAddress.locality || request.city || ''
+    const state = postalAddress.administrativeArea || request.state || ''
+    const zipcode = postalAddress.postalCode || request.zipcode || ''
+    const countryCode = postalAddress.regionCode || ''
+    
+    // Map country code to country name if needed
+    let validatedCountry = request.country || ''
+    if (countryCode && !validatedCountry) {
+      // Map common country codes to names
+      const codeToCountry: Record<string, string> = {
+        US: 'United States',
+        GB: 'United Kingdom',
+        CA: 'Canada',
+        DE: 'Germany',
+        FR: 'France',
+        ES: 'Spain',
+        IT: 'Italy',
+        NL: 'Netherlands',
+        BE: 'Belgium',
+        CH: 'Switzerland',
+        AT: 'Austria',
+        SE: 'Sweden',
+        NO: 'Norway',
+        DK: 'Denmark',
+        FI: 'Finland',
+        PL: 'Poland',
+        PT: 'Portugal',
+        GR: 'Greece',
+        IE: 'Ireland',
+        AU: 'Australia',
+        NZ: 'New Zealand',
+        JP: 'Japan',
+        MX: 'Mexico',
+      }
+      validatedCountry = codeToCountry[countryCode.toUpperCase()] || countryCode
     }
 
     return {
-      uspsConsumerKey: cachedUspsConsumerKey,
-      uspsConsumerSecret: cachedUspsConsumerSecret,
-      geoapifyApiKey: cachedGeoapifyApiKey,
+      status: isDeliverable ? 'valid' : 'invalid',
+      message: isDeliverable
+        ? 'Address validated by Google Maps'
+        : 'Address found but may not be deliverable',
+      validatedAddress: {
+        address1,
+        address2: address2 || undefined,
+        city,
+        state,
+        zipcode,
+        country: validatedCountry || request.country || '',
+      },
     }
   } catch (error) {
-    console.error('Error getting API keys from SSM:', error)
-    throw new Error('Failed to retrieve API keys from SSM Parameter Store')
+    console.error('[Google Maps Error] Validation error:', error)
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    }
   }
 }
 
 export const handler = async (event: SQSEvent): Promise<void> => {
-  console.log('Processing', event.Records.length, 'address validation requests')
 
   for (const record of event.Records) {
     try {
@@ -139,188 +345,12 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 async function processRecord(record: SQSRecord): Promise<void> {
   const request: AddressValidationRequest = JSON.parse(record.body)
 
-  console.log('Validating address for recipient:', request.recipientId)
 
-  // Determine if US or international
-  const country = request.country?.toLowerCase() || ''
-  const isUSAddress =
-    !country || country === 'usa' || country === 'united states' || country === 'us'
-
-  let result: ValidationResult
-
-  if (isUSAddress) {
-    result = await validateUSPSAddress(request)
-  } else {
-    result = await validateGeoapifyAddress(request)
-  }
+  // Use Google Maps for both US and international addresses
+  const result = await validateGoogleMapsAddress(request)
 
   // Update recipient in DynamoDB
   await updateRecipientValidation(request.recipientId, result)
-}
-
-async function validateUSPSAddress(request: AddressValidationRequest): Promise<ValidationResult> {
-  try {
-    // Get API keys from SSM
-    const { uspsConsumerKey, uspsConsumerSecret } = await getApiKeys()
-
-    // Get OAuth token
-    const tokenResponse = await fetch('https://apis-tem.usps.com/oauth2/v3/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: uspsConsumerKey,
-        client_secret: uspsConsumerSecret,
-        scope: 'addresses',
-      }),
-    })
-
-    if (!tokenResponse.ok) {
-      throw new Error(`OAuth token request failed: ${tokenResponse.status}`)
-    }
-
-    const tokenData = await tokenResponse.json()
-    const accessToken = tokenData.access_token
-
-    // Strip ZIP+4 for USPS API
-    let zipcode = request.zipcode
-    if (zipcode.includes('-')) {
-      zipcode = zipcode.split('-')[0]
-    }
-
-    // Convert state to 2-letter code if needed
-    const state = getStateAbbreviation(request.state)
-
-    // Build query parameters for USPS Address Validation API (GET request per API spec)
-    const params = new URLSearchParams({
-      streetAddress: request.address1,
-      state: state,
-    })
-
-    // Add optional parameters
-    if (request.address2) {
-      params.append('secondaryAddress', request.address2)
-    }
-    if (request.city) {
-      params.append('city', request.city)
-    }
-    if (zipcode) {
-      params.append('ZIPCode', zipcode)
-    }
-
-    // Validate address using GET request
-    const url = `https://apis-tem.usps.com/addresses/v3/address?${params.toString()}`
-    const validateResponse = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/json',
-      },
-    })
-
-    if (!validateResponse.ok) {
-      const errorText = await validateResponse.text()
-      return {
-        status: 'invalid',
-        message: `USPS validation failed: ${errorText}`,
-      }
-    }
-
-    const data = await validateResponse.json()
-    const address = data.address
-
-    return {
-      status: 'valid',
-      message: 'Address validated by USPS',
-      validatedAddress: {
-        address1: address.streetAddress || request.address1,
-        address2: address.secondaryAddress || request.address2,
-        city: address.city || request.city,
-        state: address.state || request.state,
-        zipcode: address.ZIPCode
-          ? `${address.ZIPCode}${address.ZIPPlus4 ? '-' + address.ZIPPlus4 : ''}`
-          : request.zipcode,
-        country: 'United States', // Always set to USA for USPS-validated addresses
-      },
-    }
-  } catch (error) {
-    console.error('USPS validation error:', error)
-    return {
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    }
-  }
-}
-
-async function validateGeoapifyAddress(
-  request: AddressValidationRequest,
-): Promise<ValidationResult> {
-  try {
-    // Get API keys from SSM
-    const { geoapifyApiKey } = await getApiKeys()
-
-    const addressParts = [
-      request.address1,
-      request.address2,
-      request.city,
-      request.state,
-      request.zipcode,
-      request.country,
-    ].filter(Boolean)
-
-    const addressString = addressParts.join(', ')
-
-    const url = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(addressString)}&apiKey=${geoapifyApiKey}&format=json`
-
-    const response = await fetch(url)
-
-    if (!response.ok) {
-      return {
-        status: 'invalid',
-        message: `Geoapify validation failed: ${response.status}`,
-      }
-    }
-
-    const data = await response.json()
-
-    if (!data.results || data.results.length === 0) {
-      return {
-        status: 'invalid',
-        message: 'Address not found',
-      }
-    }
-
-    const result = data.results[0]
-
-    // Check confidence
-    if (result.rank?.confidence < 0.5) {
-      return {
-        status: 'invalid',
-        message: 'Low confidence match',
-      }
-    }
-
-    return {
-      status: 'valid',
-      message: 'Address validated by Geoapify',
-      validatedAddress: {
-        address1: extractStreetAddress(result),
-        address2: request.address2 || '',
-        city: result.city || request.city,
-        state: result.state || request.state,
-        zipcode: result.postcode || request.zipcode,
-        country: result.country || request.country,
-      },
-    }
-  } catch (error) {
-    console.error('Geoapify validation error:', error)
-    return {
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    }
-  }
 }
 
 async function updateRecipientValidation(
@@ -354,80 +384,4 @@ async function updateRecipientValidation(
 
   await docClient.send(new UpdateCommand(updateParams))
 
-  console.log(`Updated recipient ${recipientId} with validation status: ${result.status}`)
-}
-
-function extractStreetAddress(result: any): string {
-  const parts = []
-
-  if (result.housenumber) {
-    parts.push(result.housenumber)
-  }
-
-  if (result.street) {
-    parts.push(result.street)
-  } else if (result.address_line1) {
-    return result.address_line1
-  }
-
-  return parts.join(' ') || result.formatted?.split(',')[0] || ''
-}
-
-function getStateAbbreviation(state: string): string {
-  const stateMap: Record<string, string> = {
-    alabama: 'AL',
-    alaska: 'AK',
-    arizona: 'AZ',
-    arkansas: 'AR',
-    california: 'CA',
-    colorado: 'CO',
-    connecticut: 'CT',
-    delaware: 'DE',
-    florida: 'FL',
-    georgia: 'GA',
-    hawaii: 'HI',
-    idaho: 'ID',
-    illinois: 'IL',
-    indiana: 'IN',
-    iowa: 'IA',
-    kansas: 'KS',
-    kentucky: 'KY',
-    louisiana: 'LA',
-    maine: 'ME',
-    maryland: 'MD',
-    massachusetts: 'MA',
-    michigan: 'MI',
-    minnesota: 'MN',
-    mississippi: 'MS',
-    missouri: 'MO',
-    montana: 'MT',
-    nebraska: 'NE',
-    nevada: 'NV',
-    'new hampshire': 'NH',
-    'new jersey': 'NJ',
-    'new mexico': 'NM',
-    'new york': 'NY',
-    'north carolina': 'NC',
-    'north dakota': 'ND',
-    ohio: 'OH',
-    oklahoma: 'OK',
-    oregon: 'OR',
-    pennsylvania: 'PA',
-    'rhode island': 'RI',
-    'south carolina': 'SC',
-    'south dakota': 'SD',
-    tennessee: 'TN',
-    texas: 'TX',
-    utah: 'UT',
-    vermont: 'VT',
-    virginia: 'VA',
-    washington: 'WA',
-    'west virginia': 'WV',
-    wisconsin: 'WI',
-    wyoming: 'WY',
-    'district of columbia': 'DC',
-  }
-
-  const normalized = state.toLowerCase().trim()
-  return stateMap[normalized] || state
 }
