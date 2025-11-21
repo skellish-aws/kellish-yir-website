@@ -21,6 +21,8 @@
     "@primeuix/themes": "^1.1.1",
     "@primevue/themes": "^4.3.5",
     "aws-amplify": "^6.15.0",
+    "browser-image-compression": "^2.0.2",
+    "exifreader": "^4.32.0",
     "pinia": "^3.0.1",
     "primeflex": "^4.0.0",
     "primeicons": "^7.0.0",

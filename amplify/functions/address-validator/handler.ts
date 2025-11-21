@@ -96,35 +96,35 @@ async function getGoogleMapsApiKey(): Promise<string> {
  */
 function mapCountryToCode(country: string): string | null {
   const countryLower = country.toLowerCase().trim()
-  
+
   const countryMap: Record<string, string> = {
     'united states': 'US',
-    'usa': 'US',
-    'us': 'US',
-    'germany': 'DE',
-    'deutschland': 'DE',
+    usa: 'US',
+    us: 'US',
+    germany: 'DE',
+    deutschland: 'DE',
     'united kingdom': 'GB',
-    'uk': 'GB',
+    uk: 'GB',
     'great britain': 'GB',
-    'canada': 'CA',
-    'france': 'FR',
-    'australia': 'AU',
-    'japan': 'JP',
-    'mexico': 'MX',
-    'spain': 'ES',
-    'italy': 'IT',
-    'netherlands': 'NL',
-    'belgium': 'BE',
-    'switzerland': 'CH',
-    'austria': 'AT',
-    'sweden': 'SE',
-    'norway': 'NO',
-    'denmark': 'DK',
-    'finland': 'FI',
-    'poland': 'PL',
-    'portugal': 'PT',
-    'greece': 'GR',
-    'ireland': 'IE',
+    canada: 'CA',
+    france: 'FR',
+    australia: 'AU',
+    japan: 'JP',
+    mexico: 'MX',
+    spain: 'ES',
+    italy: 'IT',
+    netherlands: 'NL',
+    belgium: 'BE',
+    switzerland: 'CH',
+    austria: 'AT',
+    sweden: 'SE',
+    norway: 'NO',
+    denmark: 'DK',
+    finland: 'FI',
+    poland: 'PL',
+    portugal: 'PT',
+    greece: 'GR',
+    ireland: 'IE',
     'new zealand': 'NZ',
   }
 
@@ -180,158 +180,245 @@ function formatAddressForGoogleMaps(address: AddressValidationRequest): any {
 }
 
 /**
- * Validate address using Google Maps Address Validation API
+ * Sleep utility for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Check if error is retryable
+ */
+function isRetryableError(error: any, statusCode?: number): boolean {
+  // Network errors (connection reset, timeout)
+  if (error?.code === 'ECONNRESET' || error?.code === 'ETIMEDOUT') {
+    return true
+  }
+
+  // HTTP 5xx errors (server errors) are retryable
+  if (statusCode && statusCode >= 500 && statusCode < 600) {
+    return true
+  }
+
+  // Rate limit errors (429) are retryable
+  if (statusCode === 429) {
+    return true
+  }
+
+  // HTTP 408 (Request Timeout) is retryable
+  if (statusCode === 408) {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Validate address using Google Maps Address Validation API with retry logic
  */
 async function validateGoogleMapsAddress(
   request: AddressValidationRequest,
 ): Promise<ValidationResult> {
-  try {
-    const apiKey = await getGoogleMapsApiKey()
+  const maxRetries = 3
+  const retryDelays = [1000, 5000, 30000] // 1s, 5s, 30s
 
-    // Determine if this is a US address for CASS enablement
-    const requestCountry = (request.country || '').toLowerCase()
-    const isUSAddress = 
-      !requestCountry || 
-      requestCountry === 'us' || 
-      requestCountry === 'usa' || 
-      requestCountry === 'united states'
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const apiKey = await getGoogleMapsApiKey()
 
-    // Format address for Google Maps API
-    const formattedAddress = formatAddressForGoogleMaps(request)
+      // Determine if this is a US address for CASS enablement
+      const requestCountry = (request.country || '').toLowerCase()
+      const isUSAddress =
+        !requestCountry ||
+        requestCountry === 'us' ||
+        requestCountry === 'usa' ||
+        requestCountry === 'united states'
 
-    // Build Google Maps API request
-    const googleMapsRequest = {
-      address: formattedAddress,
-      enableUspsCass: isUSAddress, // Enable CASS for US addresses
-    }
+      // Format address for Google Maps API
+      const formattedAddress = formatAddressForGoogleMaps(request)
 
+      // Build Google Maps API request
+      const googleMapsRequest = {
+        address: formattedAddress,
+        enableUspsCass: isUSAddress, // Enable CASS for US addresses
+      }
 
-    // Call Google Maps Address Validation API
-    const response = await fetch(
-      `https://addressvalidation.googleapis.com/v1:validateAddress?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Call Google Maps Address Validation API
+      const response = await fetch(
+        `https://addressvalidation.googleapis.com/v1:validateAddress?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(googleMapsRequest),
         },
-        body: JSON.stringify(googleMapsRequest),
-      },
-    )
+      )
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[Google Maps Error] API error:', response.status, errorText)
+      if (!response.ok) {
+        const statusCode = response.status
+        const errorText = await response.text()
+
+        // Check if error is retryable
+        if (isRetryableError(null, statusCode) && attempt < maxRetries - 1) {
+          console.warn(
+            `[Google Maps Error] Retryable error (attempt ${attempt + 1}/${maxRetries}):`,
+            statusCode,
+            errorText,
+          )
+          await sleep(retryDelays[attempt])
+          continue // Retry
+        }
+
+        // Rate limit exceeded - mark as error, can retry later via DLQ
+        if (statusCode === 429) {
+          console.error('[Google Maps Error] Rate limit exceeded:', errorText)
+          return {
+            status: 'error',
+            message: 'Rate limit exceeded, will retry later',
+          }
+        }
+
+        // Non-retryable error
+        console.error('[Google Maps Error] API error:', statusCode, errorText)
+        return {
+          status: 'error',
+          message: `Google Maps validation failed: ${statusCode}`,
+        }
+      }
+
+      // If we get here, validation was successful
+      const data = await response.json()
+      return processValidationResult(data, request)
+    } catch (error: any) {
+      // Check if error is retryable
+      if (isRetryableError(error) && attempt < maxRetries - 1) {
+        console.warn(
+          `[Google Maps Error] Retryable network error (attempt ${attempt + 1}/${maxRetries}):`,
+          error.message,
+        )
+        await sleep(retryDelays[attempt])
+        continue // Retry
+      }
+
+      // Non-retryable error or max retries reached
+      console.error('[Google Maps Error] Validation error:', error)
       return {
-        status: 'invalid',
-        message: `Google Maps validation failed: ${response.status} ${errorText}`,
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error',
       }
     }
+  }
 
-    const data = await response.json()
+  // If we get here, all retries failed
+  return {
+    status: 'error',
+    message: 'Validation failed after retries',
+  }
+}
 
-    if (!data.result) {
-      return {
-        status: 'invalid',
-        message: 'Address validation failed - no result from Google Maps',
-      }
+/**
+ * Process validation result from Google Maps API
+ */
+function processValidationResult(data: any, request: AddressValidationRequest): ValidationResult {
+  if (!data.result) {
+    return {
+      status: 'invalid',
+      message: 'Address validation failed - no result from Google Maps',
     }
+  }
 
-    const result = data.result
-    const verdict = result.verdict || {}
-    const postalAddress = result.address?.postalAddress || {}
+  const result = data.result
+  const verdict = result.verdict || {}
+  const postalAddress = result.address?.postalAddress || {}
 
-    // Determine if address is deliverable
-    // SUB_PREMISE means apartment/unit - this is deliverable!
-    // Only 'OTHER' granularity means not deliverable
-    // For international addresses, we rely on addressComplete and validationGranularity
-    const deliverable =
-      verdict.addressComplete === true &&
-      verdict.validationGranularity !== 'OTHER'
-    
-    // Also check USPS DPV confirmation if available (more reliable for US addresses)
-    const uspsData = result.uspsData
-    // USPS DPV confirmation codes:
-    // "Y" = Confirmed deliverable
-    // "D" = Confirmed with Drop (also deliverable)
-    // "S" = Confirmed at Street level (also deliverable)
-    // "N" = Not deliverable
-    const dpvConfirmation = uspsData?.dpvConfirmation
-    const uspsDeliverable = dpvConfirmation === 'Y' || dpvConfirmation === 'D' || dpvConfirmation === 'S'
-    const uspsNotDeliverable = dpvConfirmation === 'N'
-    
-    // For US addresses: use USPS confirmation if clear, otherwise fall back to Google Maps verdict
-    // For international addresses: use Google Maps verdict (USPS data won't exist)
-    const isDeliverable = uspsData !== undefined 
-      ? (uspsNotDeliverable ? false : (uspsDeliverable ? true : deliverable)) // US address: use USPS if clear, else Google Maps
+  // Determine if address is deliverable
+  // SUB_PREMISE means apartment/unit - this is deliverable!
+  // Only 'OTHER' granularity means not deliverable
+  // For international addresses, we rely on addressComplete and validationGranularity
+  const deliverable = verdict.addressComplete === true && verdict.validationGranularity !== 'OTHER'
+
+  // Also check USPS DPV confirmation if available (more reliable for US addresses)
+  const uspsData = result.uspsData
+  // USPS DPV confirmation codes:
+  // "Y" = Confirmed deliverable
+  // "D" = Confirmed with Drop (also deliverable)
+  // "S" = Confirmed at Street level (also deliverable)
+  // "N" = Not deliverable
+  const dpvConfirmation = uspsData?.dpvConfirmation
+  const uspsDeliverable =
+    dpvConfirmation === 'Y' || dpvConfirmation === 'D' || dpvConfirmation === 'S'
+  const uspsNotDeliverable = dpvConfirmation === 'N'
+
+  // For US addresses: use USPS confirmation if clear, otherwise fall back to Google Maps verdict
+  // For international addresses: use Google Maps verdict (USPS data won't exist)
+  const isDeliverable =
+    uspsData !== undefined
+      ? uspsNotDeliverable
+        ? false
+        : uspsDeliverable
+          ? true
+          : deliverable // US address: use USPS if clear, else Google Maps
       : deliverable // International address: use Google Maps verdict
-    
 
-    // Extract address components
-    const addressLines = postalAddress.addressLines || []
-    const address1 = addressLines[0] || request.address1 || ''
-    const address2 = addressLines[1] || request.address2 || ''
-    const city = postalAddress.locality || request.city || ''
-    const state = postalAddress.administrativeArea || request.state || ''
-    const zipcode = postalAddress.postalCode || request.zipcode || ''
-    const countryCode = postalAddress.regionCode || ''
-    
-    // Map country code to country name if needed
-    let validatedCountry = request.country || ''
-    if (countryCode && !validatedCountry) {
-      // Map common country codes to names
-      const codeToCountry: Record<string, string> = {
-        US: 'United States',
-        GB: 'United Kingdom',
-        CA: 'Canada',
-        DE: 'Germany',
-        FR: 'France',
-        ES: 'Spain',
-        IT: 'Italy',
-        NL: 'Netherlands',
-        BE: 'Belgium',
-        CH: 'Switzerland',
-        AT: 'Austria',
-        SE: 'Sweden',
-        NO: 'Norway',
-        DK: 'Denmark',
-        FI: 'Finland',
-        PL: 'Poland',
-        PT: 'Portugal',
-        GR: 'Greece',
-        IE: 'Ireland',
-        AU: 'Australia',
-        NZ: 'New Zealand',
-        JP: 'Japan',
-        MX: 'Mexico',
-      }
-      validatedCountry = codeToCountry[countryCode.toUpperCase()] || countryCode
-    }
+  // Extract address components
+  const addressLines = postalAddress.addressLines || []
+  const address1 = addressLines[0] || request.address1 || ''
+  const address2 = addressLines[1] || request.address2 || ''
+  const city = postalAddress.locality || request.city || ''
+  const state = postalAddress.administrativeArea || request.state || ''
+  const zipcode = postalAddress.postalCode || request.zipcode || ''
+  const countryCode = postalAddress.regionCode || ''
 
-    return {
-      status: isDeliverable ? 'valid' : 'invalid',
-      message: isDeliverable
-        ? 'Address validated by Google Maps'
-        : 'Address found but may not be deliverable',
-      validatedAddress: {
-        address1,
-        address2: address2 || undefined,
-        city,
-        state,
-        zipcode,
-        country: validatedCountry || request.country || '',
-      },
+  // Map country code to country name if needed
+  let validatedCountry = request.country || ''
+  if (countryCode && !validatedCountry) {
+    // Map common country codes to names
+    const codeToCountry: Record<string, string> = {
+      US: 'United States',
+      GB: 'United Kingdom',
+      CA: 'Canada',
+      DE: 'Germany',
+      FR: 'France',
+      ES: 'Spain',
+      IT: 'Italy',
+      NL: 'Netherlands',
+      BE: 'Belgium',
+      CH: 'Switzerland',
+      AT: 'Austria',
+      SE: 'Sweden',
+      NO: 'Norway',
+      DK: 'Denmark',
+      FI: 'Finland',
+      PL: 'Poland',
+      PT: 'Portugal',
+      GR: 'Greece',
+      IE: 'Ireland',
+      AU: 'Australia',
+      NZ: 'New Zealand',
+      JP: 'Japan',
+      MX: 'Mexico',
     }
-  } catch (error) {
-    console.error('[Google Maps Error] Validation error:', error)
-    return {
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    }
+    validatedCountry = codeToCountry[countryCode.toUpperCase()] || countryCode
+  }
+
+  return {
+    status: isDeliverable ? 'valid' : 'invalid',
+    message: isDeliverable
+      ? 'Address validated by Google Maps'
+      : 'Address found but may not be deliverable',
+    validatedAddress: {
+      address1,
+      address2: address2 || undefined,
+      city,
+      state,
+      zipcode,
+      country: validatedCountry || request.country || '',
+    },
   }
 }
 
 export const handler = async (event: SQSEvent): Promise<void> => {
-
   for (const record of event.Records) {
     try {
       await processRecord(record)
@@ -344,7 +431,6 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
 async function processRecord(record: SQSRecord): Promise<void> {
   const request: AddressValidationRequest = JSON.parse(record.body)
-
 
   // Use Google Maps for both US and international addresses
   const result = await validateGoogleMapsAddress(request)
@@ -383,5 +469,4 @@ async function updateRecipientValidation(
   }
 
   await docClient.send(new UpdateCommand(updateParams))
-
 }

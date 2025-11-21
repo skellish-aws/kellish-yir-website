@@ -3,11 +3,17 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import path from 'path'
 import vue from '@vitejs/plugin-vue'
-import vueDevTools from 'vite-plugin-vue-devtools'
+// Temporarily disabled due to Node.js 25+ localStorage issue
+// import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue(), vueDevTools()],
+  plugins: [
+    vue(),
+    // Vue DevTools temporarily disabled due to Node.js 25+ compatibility issue
+    // Uncomment when plugin is updated to support Node.js 25+
+    // vueDevTools(),
+  ],
   build: {
     sourcemap: true,
   },

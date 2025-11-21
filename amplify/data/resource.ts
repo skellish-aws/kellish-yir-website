@@ -46,10 +46,16 @@ const schema = a.schema({
       cardHeightIn: a.float(),
       pdfWidthIn: a.float(),
       pdfHeightIn: a.float(),
+      pdfSizeMB: a.float(), // PDF file size in MB
+      cardFrontSizeMB: a.float(), // Card front image size in MB
+      cardBackSizeMB: a.float(), // Card back image size in MB
       accessLinks: a.hasMany('NewsletterAccessLink', 'newsletterId'),
       pdfPageCount: a.integer(),
     })
-    .authorization((allow) => [allow.group('Admin')]),
+    .authorization((allow) => [
+      allow.group('Admin').to(['create', 'read', 'update', 'delete']),
+      allow.authenticated().to(['read']), // Viewers can read newsletters
+    ]),
 
   // Access codes - one per recipient, gives access to all newsletters
   AccessCode: a
@@ -62,8 +68,15 @@ const schema = a.schema({
       createdAt: a.datetime().required(),
       // Link to the user who used this code
       usedBy: a.id(), // NewsletterUser ID
+      // Track who created/invited this recipient (for on-demand invitations)
+      invitedBy: a.id(), // NewsletterUser ID of Admin/Inviter who created this invitation
+      invitationType: a.string(), // 'bulk' | 'on-demand' - distinguishes bulk mailing list invitations from on-demand invitations
     })
-    .authorization((allow) => [allow.group('Admin')]),
+    .authorization((allow) => [
+      allow.group('Admin').to(['create', 'read', 'update', 'delete']),
+      // Note: API key access is handled via authMode in the client
+      // The apiKeyAuthorizationMode is configured in defineData below
+    ]),
 
   // Newsletter access links
   NewsletterAccessLink: a

@@ -15,6 +15,7 @@
       </template>
     </Toolbar>
     <router-view />
+    <Toast position="top-right" />
   </div>
 </template>
 
@@ -22,6 +23,7 @@
 import { useRouter } from 'vue-router'
 import Toolbar from 'primevue/toolbar'
 import Button from 'primevue/button'
+import Toast from 'primevue/toast'
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { getCurrentUser, signOut } from 'aws-amplify/auth'
 import { useInactivityTracker } from './utils/inactivityTracker'
@@ -164,5 +166,32 @@ onMounted(() => {
 
 .gap-2 {
   gap: 0.5rem;
+}
+</style>
+
+<style>
+/* Toast notification styling for better readability */
+.toast-success {
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
+  border-left: 4px solid #10b981 !important;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.toast-success .p-toast-summary {
+  color: #059669 !important;
+  font-weight: 600 !important;
+}
+
+.toast-success .p-toast-detail {
+  color: #374151 !important;
+}
+
+/* Position toast to avoid overlapping toolbar buttons */
+.p-toast-top-right {
+  top: 80px !important; /* Position below toolbar */
+  right: 20px !important;
 }
 </style>

@@ -5,6 +5,8 @@ import { storage } from './storage/resource'
 import { addressValidator } from './functions/address-validator/resource'
 import { queueAddressValidation } from './functions/queue-address-validation/resource'
 import { googlemapsProxy } from './functions/googlemaps-proxy/resource'
+import { exportUserData } from './functions/export-user-data/resource'
+import { validateAccessCode } from './functions/validate-access-code/resource'
 import { FunctionUrlAuthType } from 'aws-cdk-lib/aws-lambda'
 import { Duration } from 'aws-cdk-lib'
 import { Queue } from 'aws-cdk-lib/aws-sqs'
@@ -18,6 +20,8 @@ const backend = defineBackend({
   addressValidator,
   queueAddressValidation,
   googlemapsProxy,
+  exportUserData,
+  validateAccessCode,
 })
 
 // Add Function URL for Google Maps proxy.
@@ -26,7 +30,16 @@ const googlemapsFunctionUrl = backend.googlemapsProxy.resources.lambda.addFuncti
   authType: FunctionUrlAuthType.NONE, // Allow public access
 })
 
-// Create SQS queue for address validation
+// Create Dead Letter Queue for failed address validations
+const addressValidationDLQ = new Queue(
+  backend.addressValidator.resources.lambda.stack,
+  'AddressValidationDLQ',
+  {
+    retentionPeriod: Duration.days(14),
+  },
+)
+
+// Create SQS queue for address validation with DLQ
 const addressValidationQueue = new Queue(
   backend.addressValidator.resources.lambda.stack,
   'AddressValidationQueue',
@@ -34,6 +47,10 @@ const addressValidationQueue = new Queue(
     visibilityTimeout: Duration.seconds(300), // 5 minutes for validation
     retentionPeriod: Duration.days(14),
     receiveMessageWaitTime: Duration.seconds(20), // Long polling
+    deadLetterQueue: {
+      queue: addressValidationDLQ,
+      maxReceiveCount: 3, // Retry 3 times before sending to DLQ
+    },
   },
 )
 
@@ -101,10 +118,54 @@ backend.googlemapsProxy.resources.lambda.addToRolePolicy(
   }),
 )
 
+// Add Function URL for validate access code Lambda (public access)
+const validateCodeFunctionUrl = backend.validateAccessCode.resources.lambda.addFunctionUrl({
+  authType: FunctionUrlAuthType.NONE, // Allow public access for code validation
+})
+
+// Grant permissions to validate code Lambda
+backend.data.resources.tables['AccessCode'].grantReadData(
+  backend.validateAccessCode.resources.lambda,
+)
+
+// Add Function URL for export user data Lambda (admin only, requires IAM auth)
+const exportFunctionUrl = backend.exportUserData.resources.lambda.addFunctionUrl({
+  authType: FunctionUrlAuthType.AWS_IAM, // Require IAM authentication (admin only)
+})
+
+// Grant permissions to export Lambda
+backend.data.resources.tables['NewsletterUser'].grantReadData(
+  backend.exportUserData.resources.lambda,
+)
+backend.data.resources.tables['AccessCode'].grantReadData(backend.exportUserData.resources.lambda)
+backend.data.resources.tables['Recipient'].grantReadData(backend.exportUserData.resources.lambda)
+backend.data.resources.tables['Newsletter'].grantReadData(backend.exportUserData.resources.lambda)
+
+// Set environment variables for export Lambda (table names)
+const exportLambdaFunction = backend.exportUserData.resources.lambda as any
+exportLambdaFunction.addEnvironment(
+  'NEWSLETTER_USER_TABLE_NAME',
+  backend.data.resources.tables['NewsletterUser'].tableName,
+)
+exportLambdaFunction.addEnvironment(
+  'ACCESS_CODE_TABLE_NAME',
+  backend.data.resources.tables['AccessCode'].tableName,
+)
+exportLambdaFunction.addEnvironment(
+  'RECIPIENT_TABLE_NAME',
+  backend.data.resources.tables['Recipient'].tableName,
+)
+exportLambdaFunction.addEnvironment(
+  'NEWSLETTER_TABLE_NAME',
+  backend.data.resources.tables['Newsletter'].tableName,
+)
+
 // Export Lambda URLs for client
 backend.addOutput({
   custom: {
     queueValidationUrl: queueFunctionUrl.url,
     googlemapsProxyUrl: googlemapsFunctionUrl.url,
+    exportUserDataUrl: exportFunctionUrl.url,
+    validateAccessCodeUrl: validateCodeFunctionUrl.url,
   },
 })

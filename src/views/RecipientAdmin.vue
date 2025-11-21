@@ -61,14 +61,20 @@
           class="w-48"
           @change="filterRecipients"
         />
-        <div class="flex items-center gap-2 bg-red-50 dark:bg-red-900 px-3 py-2 rounded border border-red-200 dark:border-red-700">
+        <div
+          class="flex items-center gap-2 bg-red-50 dark:bg-red-900 px-3 py-2 rounded border border-red-200 dark:border-red-700"
+        >
           <Checkbox
             v-model="showInvalidAddressesOnly"
             inputId="invalidAddresses"
             :binary="true"
+            :disabled="recipients.length === 0"
             @change="filterRecipients"
           />
-          <label for="invalidAddresses" class="text-sm font-medium text-red-700 dark:text-red-300 cursor-pointer">
+          <label
+            for="invalidAddresses"
+            class="text-sm font-medium text-red-700 dark:text-red-300 cursor-pointer"
+          >
             Show Invalid/Error/No Address
           </label>
         </div>
@@ -85,7 +91,9 @@
 
     <div v-else class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
       <!-- Header Row -->
-      <div class="bg-gray-100 dark:bg-gray-700 px-4 py-3 border-b dark:border-gray-600 font-semibold text-sm text-gray-700 dark:text-gray-200">
+      <div
+        class="bg-gray-100 dark:bg-gray-700 px-4 py-3 border-b dark:border-gray-600 font-semibold text-sm text-gray-700 dark:text-gray-200"
+      >
         <div class="grid grid-cols-12 gap-4 items-center">
           <div class="col-span-1">
             <input
@@ -122,7 +130,8 @@
               class="ml-1 text-xs"
             ></i>
           </div>
-          <div class="col-span-2 cursor-pointer hover:text-blue-600" @click="sortBy('status')">
+          <div class="col-span-1">Invited By</div>
+          <div class="col-span-1 cursor-pointer hover:text-blue-600" @click="sortBy('status')">
             Status
             <i
               v-if="sortField === 'status'"
@@ -163,14 +172,21 @@
               <div v-if="recipient.mailingName" class="text-xs text-gray-400 dark:text-gray-400">
                 {{ recipient.firstName }} {{ recipient.lastName }}
               </div>
-              <div v-else class="text-sm text-gray-500 dark:text-gray-300">{{ recipient.title }}</div>
+              <div v-else-if="recipient.title" class="text-sm text-gray-500 dark:text-gray-300">
+                {{ recipient.title }}
+              </div>
+              <div v-if="recipient.email" class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {{ recipient.email }}
+              </div>
             </div>
 
             <!-- Address -->
             <div class="col-span-2">
               <div class="flex items-start gap-2">
                 <div class="flex-1">
-                  <div v-if="recipient.address1" class="text-sm text-gray-900 dark:text-gray-100">{{ recipient.address1 }}</div>
+                  <div v-if="recipient.address1" class="text-sm text-gray-900 dark:text-gray-100">
+                    {{ recipient.address1 }}
+                  </div>
                   <div v-if="recipient.address2" class="text-sm text-gray-600 dark:text-gray-300">
                     {{ recipient.address2 }}
                   </div>
@@ -225,22 +241,38 @@
 
             <!-- Access Code -->
             <div class="col-span-2">
-              <div
-                v-if="recipient.accessCode"
-                class="font-mono text-sm bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-2 py-1 rounded"
-              >
-                {{ recipient.accessCode }}
+              <div v-if="recipient.accessCode" class="flex items-center gap-2">
+                <div
+                  class="font-mono text-sm bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-2 py-1 rounded flex-1"
+                >
+                  {{ recipient.accessCode }}
+                </div>
+                <button
+                  @click="copyRegistrationUrl(recipient.accessCode)"
+                  class="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900 rounded"
+                  title="Copy registration URL"
+                >
+                  <i class="pi pi-copy text-sm"></i>
+                </button>
               </div>
               <div v-else class="text-gray-400 dark:text-gray-500 text-sm">No code</div>
             </div>
 
+            <!-- Invited By -->
+            <div class="col-span-1">
+              <div class="text-sm text-gray-600 dark:text-gray-300">
+                {{ getInviterName(recipient.accessCode) || '—' }}
+              </div>
+            </div>
+
             <!-- Status -->
-            <div class="col-span-2">
+            <div class="col-span-1">
               <div class="flex flex-col gap-1">
                 <span
                   :class="{
                     'text-green-600 dark:text-green-400': recipient.accessCodeUsed,
-                    'text-yellow-600 dark:text-yellow-400': !recipient.accessCodeUsed && recipient.accessCode,
+                    'text-yellow-600 dark:text-yellow-400':
+                      !recipient.accessCodeUsed && recipient.accessCode,
                     'text-gray-400 dark:text-gray-500': !recipient.accessCode,
                   }"
                   class="text-sm font-medium"
@@ -273,8 +305,18 @@
                 </button>
                 <button
                   @click="regenerateCode(recipient)"
-                  class="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900 rounded"
-                  title="Regenerate code"
+                  :disabled="recipient.accessCodeUsed"
+                  :class="[
+                    'p-1 rounded',
+                    recipient.accessCodeUsed
+                      ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                      : 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900',
+                  ]"
+                  :title="
+                    recipient.accessCodeUsed
+                      ? 'Cannot regenerate code: recipient has already registered'
+                      : 'Regenerate code'
+                  "
                 >
                   <i class="pi pi-refresh text-sm"></i>
                 </button>
@@ -301,9 +343,10 @@
         @click="confirmBulkDelete"
       />
       <Button
-        :label="`Generate Codes (${selectedRecipients.length})`"
+        :label="`Regenerate Codes (${selectedRecipients.length})`"
         icon="pi pi-key"
         class="p-button-outlined"
+        title="Regenerate access codes for selected recipients (will skip recipients who have already registered)"
         @click="generateCodesForSelected"
       />
     </div>
@@ -314,7 +357,14 @@
         label="Remove Duplicates"
         icon="pi pi-filter"
         class="p-button-warning"
+        :disabled="recipients.length === 0"
         @click="removeDuplicates"
+      />
+      <Button
+        label="Clean Up Invalid Recipients"
+        icon="pi pi-trash"
+        class="p-button-danger"
+        @click="cleanupInvalidRecipients"
       />
     </div>
 
@@ -353,21 +403,16 @@
             />
           </div>
           <div class="col-span-3">
-            <label class="block text-sm font-medium mb-1">First Name *</label>
-            <InputText
-              v-model="form.firstName"
-              class="w-full"
-              required
-              @input="updateMailingName"
-            />
+            <label class="block text-sm font-medium mb-1">First Name</label>
+            <InputText v-model="form.firstName" class="w-full" @input="updateMailingName" />
           </div>
           <div class="col-span-2">
             <label class="block text-sm font-medium mb-1">Second Name</label>
             <InputText v-model="form.secondName" class="w-full" @input="updateMailingName" />
           </div>
           <div class="col-span-2">
-            <label class="block text-sm font-medium mb-1">Last Name *</label>
-            <InputText v-model="form.lastName" class="w-full" required @input="updateMailingName" />
+            <label class="block text-sm font-medium mb-1">Last Name</label>
+            <InputText v-model="form.lastName" class="w-full" @input="updateMailingName" />
           </div>
           <div class="col-span-2">
             <label class="block text-sm font-medium mb-1">Suffix</label>
@@ -434,14 +479,8 @@
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium mb-1">
-              Address 1
-            </label>
-            <InputText
-              v-model="form.address1"
-              placeholder="Enter address"
-              class="w-full"
-            />
+            <label class="block text-sm font-medium mb-1"> Address 1 </label>
+            <InputText v-model="form.address1" placeholder="Enter address" class="w-full" />
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Address 2</label>
@@ -475,9 +514,32 @@
           </div>
         </div>
 
-        <div v-if="form.accessCode" class="bg-gray-50 dark:bg-gray-700 p-3 rounded">
-          <label class="block text-sm font-medium mb-1 text-gray-900 dark:text-gray-100">Access Code</label>
-          <div class="font-mono text-sm text-gray-900 dark:text-gray-100">{{ form.accessCode }}</div>
+        <div v-if="form.accessCode" class="bg-gray-50 dark:bg-gray-700 p-3 rounded space-y-3">
+          <div>
+            <label class="block text-sm font-medium mb-1 text-gray-900 dark:text-gray-100"
+              >Access Code</label
+            >
+            <div class="font-mono text-sm text-gray-900 dark:text-gray-100">
+              {{ form.accessCode }}
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1 text-gray-900 dark:text-gray-100"
+              >Invited By</label
+            >
+            <Dropdown
+              v-model="formInvitedBy"
+              :options="inviterUsers"
+              optionLabel="name"
+              optionValue="id"
+              placeholder="Select inviter"
+              class="w-full"
+              :showClear="false"
+            />
+            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              The user who invited this recipient (for on-demand invitations)
+            </div>
+          </div>
         </div>
       </div>
 
@@ -518,8 +580,22 @@
           :maxFileSize="10000000"
         />
 
+        <div
+          v-if="importError"
+          class="p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded"
+        >
+          <div class="flex items-start gap-2">
+            <i class="pi pi-exclamation-triangle text-red-600 dark:text-red-300 mt-0.5"></i>
+            <div class="text-sm text-red-800 dark:text-red-200 whitespace-pre-line">
+              {{ importError }}
+            </div>
+          </div>
+        </div>
+
         <div v-if="importPreview.length > 0" class="max-h-60 overflow-y-auto">
-          <h4 class="font-medium mb-2 text-gray-900 dark:text-gray-100">Preview ({{ importPreview.length }} recipients):</h4>
+          <h4 class="font-medium mb-2 text-gray-900 dark:text-gray-100">
+            Preview ({{ importPreview.length }} recipients):
+          </h4>
           <div class="space-y-1">
             <div
               v-for="(recipient, index) in importPreview.slice(0, 10)"
@@ -537,23 +613,45 @@
       </div>
 
       <template #footer>
-        <Button label="Cancel" @click="cancelImport" />
-        <Button
-          label="Import Recipients"
-          icon="pi pi-upload"
-          @click="importRecipients"
-          :disabled="importPreview.length === 0"
-          :loading="importing"
-        />
+        <div class="flex justify-between w-full">
+          <Button
+            label="Download Template"
+            icon="pi pi-download"
+            class="p-button-outlined"
+            size="small"
+            @click="downloadCSVTemplate"
+          />
+          <div class="flex gap-2">
+            <Button label="Cancel" size="small" @click="cancelImport" />
+            <Button
+              label="Import Recipients"
+              icon="pi pi-upload"
+              size="small"
+              @click="importRecipients"
+              :disabled="importPreview.length === 0"
+              :loading="importing"
+            />
+          </div>
+        </div>
       </template>
     </Dialog>
 
     <!-- Delete Confirmation -->
     <Dialog v-model:visible="deleteDialogVisible" header="Confirm Delete" modal>
-      <span>Are you sure you want to delete {{ selectedRecipients.length }} recipient(s)?</span>
+      <span v-if="recipientToDelete">
+        Are you sure you want to delete
+        {{ recipientToDelete.firstName }} {{ recipientToDelete.lastName }}?
+      </span>
+      <span v-else
+        >Are you sure you want to delete {{ selectedRecipients.length }} recipient(s)?</span
+      >
       <template #footer>
-        <Button label="Cancel" @click="deleteDialogVisible = false" />
-        <Button label="Delete" class="p-button-danger" @click="deleteSelectedRecipients" />
+        <Button label="Cancel" @click="cancelDelete" />
+        <Button
+          :label="recipientToDelete ? 'Delete' : 'Delete'"
+          class="p-button-danger"
+          @click="recipientToDelete ? deleteSingleRecipient() : deleteSelectedRecipients()"
+        />
       </template>
     </Dialog>
 
@@ -566,20 +664,28 @@
     >
       <div class="space-y-4">
         <p class="text-gray-700">
-          Google Maps Address Validation returned a standardized version of this address. Which would
-          you like to use?
+          Google Maps Address Validation returned a standardized version of this address. Which
+          would you like to use?
         </p>
 
         <div class="grid grid-cols-2 gap-4">
           <!-- Original Address -->
           <div class="border rounded p-3 bg-gray-50 dark:bg-gray-800">
-            <h4 class="font-semibold text-sm text-gray-600 dark:text-gray-300 mb-2">Your Address:</h4>
+            <h4 class="font-semibold text-sm text-gray-600 dark:text-gray-300 mb-2">
+              Your Address:
+            </h4>
             <div class="text-sm text-gray-900 dark:text-gray-100" v-if="originalAddress">
-              <div v-if="originalAddress.address1" class="text-gray-900 dark:text-gray-100">{{ originalAddress.address1 }}</div>
+              <div v-if="originalAddress.address1" class="text-gray-900 dark:text-gray-100">
+                {{ originalAddress.address1 }}
+              </div>
               <div v-else class="text-gray-400 dark:text-gray-500 italic">(no street address)</div>
-              <div v-if="originalAddress.address2" class="text-gray-900 dark:text-gray-100">{{ originalAddress.address2 }}</div>
+              <div v-if="originalAddress.address2" class="text-gray-900 dark:text-gray-100">
+                {{ originalAddress.address2 }}
+              </div>
               <div class="text-gray-900 dark:text-gray-100">
-                <template v-if="originalAddress.city || originalAddress.state || originalAddress.zipcode">
+                <template
+                  v-if="originalAddress.city || originalAddress.state || originalAddress.zipcode"
+                >
                   <span v-if="originalAddress.city">{{ originalAddress.city }}</span>
                   <span v-if="originalAddress.city && originalAddress.state">, </span>
                   <template v-if="originalAddress.state">
@@ -589,53 +695,67 @@
                   <span v-if="originalAddress.zipcode">{{ originalAddress.zipcode }}</span>
                 </template>
               </div>
-              <div v-if="originalAddress.country" class="text-gray-900 dark:text-gray-100">{{ originalAddress.country }}</div>
+              <div v-if="originalAddress.country" class="text-gray-900 dark:text-gray-100">
+                {{ originalAddress.country }}
+              </div>
             </div>
-            <div v-else class="text-sm text-gray-400 dark:text-gray-500 italic">No address data</div>
+            <div v-else class="text-sm text-gray-400 dark:text-gray-500 italic">
+              No address data
+            </div>
           </div>
 
           <!-- Validated Address -->
-          <div class="border rounded p-3 bg-green-50 dark:bg-green-900 border-green-300 dark:border-green-700">
+          <div
+            class="border rounded p-3 bg-green-50 dark:bg-green-900 border-green-300 dark:border-green-700"
+          >
             <h4 class="font-semibold text-sm text-green-700 dark:text-green-300 mb-2">
               Google Maps Validated:
               <span
-                v-if="
-                  validatedAddressData &&
-                  'confidence' in validatedAddressData
-                "
+                v-if="validatedAddressData && 'confidence' in validatedAddressData"
                 class="text-xs font-normal text-gray-600 dark:text-gray-400"
               >
                 ({{ Math.round((validatedAddressData.confidence || 0) * 100) }}% confidence)
               </span>
             </h4>
             <div class="text-sm text-gray-900 dark:text-gray-100" v-if="validatedAddressData">
-              <div v-if="validatedAddressData.address1" class="text-gray-900 dark:text-gray-100">{{ validatedAddressData.address1 }}</div>
+              <div v-if="validatedAddressData.address1" class="text-gray-900 dark:text-gray-100">
+                {{ validatedAddressData.address1 }}
+              </div>
               <div v-else class="text-gray-400 dark:text-gray-500 italic">(no street address)</div>
-              <div v-if="validatedAddressData.address2" class="text-gray-900 dark:text-gray-100">{{ validatedAddressData.address2 }}</div>
+              <div v-if="validatedAddressData.address2" class="text-gray-900 dark:text-gray-100">
+                {{ validatedAddressData.address2 }}
+              </div>
               <div class="text-gray-900 dark:text-gray-100">
-                <template v-if="validatedAddressData.city || validatedAddressData.state || validatedAddressData.zipcode">
+                <template
+                  v-if="
+                    validatedAddressData.city ||
+                    validatedAddressData.state ||
+                    validatedAddressData.zipcode
+                  "
+                >
                   <span v-if="validatedAddressData.city">{{ validatedAddressData.city }}</span>
                   <span v-if="validatedAddressData.city && validatedAddressData.state">, </span>
                   <template v-if="validatedAddressData.state">
                     {{ validatedAddressData.state }}
                     <template v-if="validatedAddressData.zipcode">&nbsp;</template>
                   </template>
-                  <span v-if="validatedAddressData.zipcode">{{ validatedAddressData.zipcode }}</span>
+                  <span v-if="validatedAddressData.zipcode">{{
+                    validatedAddressData.zipcode
+                  }}</span>
                 </template>
               </div>
               <div v-if="validatedAddressData.country" class="text-gray-900 dark:text-gray-100">
                 {{ validatedAddressData.country }}
               </div>
             </div>
-            <div v-else class="text-sm text-gray-400 dark:text-gray-500 italic">No validated address data</div>
+            <div v-else class="text-sm text-gray-400 dark:text-gray-500 italic">
+              No validated address data
+            </div>
           </div>
         </div>
 
         <!-- Show Alternatives Button (if available) -->
-        <div
-          v-if="alternativeAddresses.length > 0"
-          class="text-center"
-        >
+        <div v-if="alternativeAddresses.length > 0" class="text-center">
           <Button
             :label="showAlternatives ? 'Hide Alternatives' : 'Show Other Matches'"
             icon="pi pi-list"
@@ -646,7 +766,9 @@
 
         <!-- Alternative Addresses List -->
         <div v-if="showAlternatives && alternativeAddresses.length > 0" class="space-y-2">
-          <h4 class="font-semibold text-sm text-gray-700 dark:text-gray-200">Other Possible Matches:</h4>
+          <h4 class="font-semibold text-sm text-gray-700 dark:text-gray-200">
+            Other Possible Matches:
+          </h4>
           <div
             v-for="(alt, index) in alternativeAddresses"
             :key="index"
@@ -671,7 +793,7 @@
       <template #footer>
         <Button label="Use My Address" class="p-button-outlined" @click="useOriginalAddress" />
         <Button
-              :label="`Use Google Maps Address`"
+          :label="`Use Google Maps Address`"
           class="p-button-success"
           @click="useValidatedAddress"
         />
@@ -689,9 +811,7 @@
         <div class="flex items-start gap-3">
           <i class="pi pi-exclamation-triangle text-yellow-600 text-3xl"></i>
           <div class="flex-1">
-            <p class="text-gray-700 mb-3">
-              Google Maps could not validate this address:
-            </p>
+            <p class="text-gray-700 mb-3">Google Maps could not validate this address:</p>
             <div class="border rounded p-3 bg-gray-50 mb-3">
               <div class="text-sm">
                 <div>{{ validationErrorAddress.address1 }}</div>
@@ -748,9 +868,11 @@ import Dropdown from 'primevue/dropdown'
 import Checkbox from 'primevue/checkbox'
 import ProgressSpinner from 'primevue/progressspinner'
 import AutoComplete from 'primevue/autocomplete'
+import { useToast } from 'primevue/usetoast'
 
 import type { Schema } from '@amplify/data/resource'
 import { generateClient } from 'aws-amplify/api'
+import { getCurrentUser } from 'aws-amplify/auth'
 import { generateAccessCode } from '../utils/access-codes.ts'
 import {
   googlemapsValidator,
@@ -797,12 +919,14 @@ interface Recipient {
 
 // State
 const client = generateClient<Schema>()
+const toast = useToast()
 const recipients = ref<Recipient[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const importing = ref(false)
 const dialogVisible = ref(false)
 const deleteDialogVisible = ref(false)
+const recipientToDelete = ref<Recipient | null>(null) // Single recipient to delete
 const showImportDialog = ref(false)
 const isEditing = ref(false)
 const selectedRecipients = ref<string[]>([])
@@ -810,6 +934,7 @@ const searchTerm = ref('')
 const statusFilter = ref('all')
 const showInvalidAddressesOnly = ref(false)
 const importPreview = ref<Recipient[]>([])
+const importError = ref<string>('')
 const sortField = ref<string>('name')
 const sortDirection = ref<'asc' | 'desc'>('asc')
 
@@ -824,9 +949,35 @@ const skipValidation = ref(false) // Flag to skip validation after user confirms
 const validationErrorMessage = ref('')
 const validationErrorAddress = ref<Partial<Recipient>>({})
 
+// Invited By state
+interface AccessCodeRecord {
+  id: string
+  code: string
+  invitedBy?: string | null
+  [key: string]: unknown
+}
+const accessCodeRecord = ref<AccessCodeRecord | null>(null) // The AccessCode record for the current recipient
+const inviterUsers = ref<Array<{ id: string; email: string; name: string }>>([]) // List of potential inviters
+const formInvitedBy = ref<string | null>(null) // Selected inviter ID
+const accessCodesMap = ref<Map<string, AccessCodeRecord>>(new Map()) // Map of accessCode -> AccessCode record
+const inviterUsersMap = ref<Map<string, { email: string; name: string }>>(new Map()) // Map of NewsletterUser ID -> {email, name}
+const currentUserNewsletterUserId = ref<string | null>(null) // Current user's NewsletterUser ID
+
+// Helper function to extract display name from email
+function getDisplayNameFromEmail(email: string): string {
+  const localPart = email.split('@')[0]
+  // Capitalize first letter and replace dots/underscores with spaces
+  return localPart
+    .replace(/[._]/g, ' ')
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
 // Mailing name auto-generation
 const mailingNameManuallyEdited = ref(false)
 const suggestedMailingName = ref('')
+const isSplittingFromMailingName = ref(false) // Flag to prevent updateMailingName during split
 
 // Address autocomplete (removed - using Google Maps validation only)
 
@@ -872,13 +1023,12 @@ const filteredTitles = ref<string[]>(titleOptions.value)
 const filteredSuffixes = ref<string[]>(suffixOptions.value)
 
 // Computed properties
-const totalRecipients = computed(() => recipients.value.length)
-const codesUsed = computed(() => recipients.value.filter((r) => r.accessCodeUsed).length)
+const totalRecipients = computed(() => recipients.value.filter((r) => r).length)
+const codesUsed = computed(() => recipients.value.filter((r) => r && r.accessCodeUsed).length)
 const codesUnused = computed(
-  () => recipients.value.filter((r) => r.accessCode && !r.accessCodeUsed).length,
+  () => recipients.value.filter((r) => r && r.accessCode && !r.accessCodeUsed).length,
 )
-const sendCards = computed(() => recipients.value.filter((r) => r.sendCard).length)
-
+const sendCards = computed(() => recipients.value.filter((r) => r && r.sendCard).length)
 
 const filteredRecipients = computed(() => {
   let filtered = recipients.value
@@ -930,9 +1080,7 @@ const filteredRecipients = computed(() => {
       filtered = filtered.filter((r) => r.addressValidationStatus === 'pending')
       break
     case 'addrnotvalidated':
-      filtered = filtered.filter(
-        (r) => r.address1 && !r.addressValidationStatus,
-      )
+      filtered = filtered.filter((r) => r.address1 && !r.addressValidationStatus)
       break
   }
 
@@ -1004,13 +1152,41 @@ async function fetchRecipients(silentUpdate = false) {
         nextToken: nextToken,
       })
 
-      if (errors) {
-        console.error('Errors fetching recipients:', errors)
-        break
+      if (errors && errors.length > 0) {
+        // Check if errors are about null required fields (expected for invalid recipients)
+        const nullFieldErrors = errors.filter(
+          (e) => e.message && e.message.includes('Cannot return null for non-nullable type'),
+        )
+
+        if (nullFieldErrors.length > 0) {
+          // These are expected errors for invalid recipients - log once per fetch, not per error
+          console.warn(
+            `⚠️ Found ${nullFieldErrors.length} GraphQL errors for recipients with null required fields. These recipients cannot be queried and need to be cleaned up manually via AWS Console.`,
+          )
+        } else {
+          // Other unexpected errors - log them all
+          console.error('Errors fetching recipients:', errors)
+          errors.forEach((error, index) => {
+            console.error(`Error ${index + 1}:`, error)
+          })
+        }
+        // Continue fetching even if there are errors, but log them
+        // Don't break - try to get as much data as possible
       }
 
       if (data) {
-        allRecipients = [...allRecipients, ...(data as Recipient[])]
+        // Filter out any null or invalid recipients (those with missing required fields)
+        const validRecipients = (data as Recipient[]).filter(
+          (r) => r && r.id && r.firstName && r.lastName && r.createdAt && r.updatedAt,
+        )
+        allRecipients = [...allRecipients, ...validRecipients]
+
+        // Log if we filtered out any invalid recipients
+        if (validRecipients.length < data.length) {
+          console.warn(
+            `⚠️ Filtered out ${data.length - validRecipients.length} invalid recipient(s) with missing required fields`,
+          )
+        }
       }
 
       nextToken = token as string | null | undefined
@@ -1018,6 +1194,9 @@ async function fetchRecipients(silentUpdate = false) {
 
     if (!silentUpdate) {
       recipients.value = allRecipients
+      console.log(`✅ Loaded ${allRecipients.length} recipient(s)`)
+      // Fetch AccessCodes and NewsletterUsers for inviter display
+      await fetchAccessCodesAndInviters()
     } else {
       // Silent update: only update validation status fields to avoid flickering
       allRecipients.forEach((fetchedRecipient) => {
@@ -1045,6 +1224,184 @@ async function fetchRecipients(silentUpdate = false) {
     if (!silentUpdate) {
       loading.value = false
     }
+  }
+}
+
+async function fetchAccessCodesAndInviters() {
+  try {
+    // Fetch all AccessCodes
+    const accessCodes: AccessCodeRecord[] = []
+    let nextToken: string | null | undefined = undefined
+    do {
+      const result = await client.models.AccessCode.list({
+        limit: 1000,
+        nextToken: nextToken,
+      })
+      if (result.data) {
+        accessCodes.push(...(result.data as AccessCodeRecord[]))
+      }
+      nextToken = result.nextToken as string | null | undefined
+    } while (nextToken)
+
+    // Build map of accessCode -> AccessCode record
+    const codesMap = new Map<string, AccessCodeRecord>()
+    accessCodes.forEach((ac) => {
+      if (ac.code) {
+        codesMap.set(ac.code, ac)
+      }
+    })
+    accessCodesMap.value = codesMap
+
+    // Fetch all NewsletterUsers to get emails
+    interface NewsletterUserRecord {
+      id: string
+      email: string
+      [key: string]: unknown
+    }
+    const users: NewsletterUserRecord[] = []
+    nextToken = undefined
+    do {
+      const result = await client.models.NewsletterUser.list({
+        limit: 1000,
+        nextToken: nextToken,
+      })
+      if (result.data) {
+        users.push(...(result.data as NewsletterUserRecord[]))
+      }
+      nextToken = result.nextToken as string | null | undefined
+    } while (nextToken)
+
+    // Build map of NewsletterUser ID -> {email, name}
+    const usersMap = new Map<string, { email: string; name: string }>()
+    users.forEach((user) => {
+      if (user.id && user.email) {
+        const name = getDisplayNameFromEmail(user.email)
+        usersMap.set(user.id, { email: user.email, name })
+      }
+    })
+    inviterUsersMap.value = usersMap
+
+    // Get current user's NewsletterUser ID
+    await getCurrentUserNewsletterUserId()
+  } catch (err) {
+    console.error('Error fetching AccessCodes and Inviters:', err)
+  }
+}
+
+async function getCurrentUserNewsletterUserId() {
+  try {
+    const currentUser = await getCurrentUser()
+    const userEmail = currentUser.signInDetails?.loginId || currentUser.username
+
+    console.log('Getting current user NewsletterUser ID, email:', userEmail)
+
+    if (userEmail) {
+      // Look up NewsletterUser by email
+      const users = await client.models.NewsletterUser.list({
+        filter: { email: { eq: userEmail } },
+      })
+
+      console.log('Found NewsletterUsers:', users.data?.length || 0)
+
+      if (users.data && users.data.length > 0) {
+        currentUserNewsletterUserId.value = users.data[0].id
+        console.log('Set currentUserNewsletterUserId to:', currentUserNewsletterUserId.value)
+      } else {
+        console.warn('No NewsletterUser found for email:', userEmail, '- creating one')
+        // Create NewsletterUser record for admin/inviter who doesn't have one
+        // This allows admins to be tracked as inviters even if they didn't register normally
+        try {
+          const newUser = await client.models.NewsletterUser.create({
+            email: userEmail,
+            accessCode: 'ADMIN', // Placeholder - admins don't need access codes
+            registeredAt: new Date().toISOString(),
+            accessLevel: 'admin',
+          })
+
+          if (newUser.data?.id) {
+            currentUserNewsletterUserId.value = newUser.data.id
+            console.log(
+              'Created NewsletterUser and set currentUserNewsletterUserId to:',
+              currentUserNewsletterUserId.value,
+            )
+            // Also update the inviter users map
+            const name = getDisplayNameFromEmail(userEmail)
+            inviterUsersMap.value.set(newUser.data.id, { email: userEmail, name })
+          }
+        } catch (createErr) {
+          console.error('Error creating NewsletterUser for admin:', createErr)
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error getting current user NewsletterUser ID:', err)
+  }
+}
+
+function getInviterName(accessCode: string | undefined): string | null {
+  if (!accessCode) return null
+  const acRecord = accessCodesMap.value.get(accessCode)
+  if (!acRecord) {
+    // AccessCode record doesn't exist - this is likely an old recipient
+    // Try to create it lazily (but don't block the UI)
+    createAccessCodeLazily(accessCode).catch((err) => {
+      console.error('Error creating AccessCode lazily:', err)
+    })
+    return null
+  }
+  if (!acRecord.invitedBy) return null
+  const inviter = inviterUsersMap.value.get(acRecord.invitedBy)
+  return inviter ? inviter.name : null
+}
+
+async function createAccessCodeLazily(accessCode: string) {
+  // Find the recipient with this access code
+  const recipient = recipients.value.find((r) => r.accessCode === accessCode)
+  if (!recipient) return
+
+  try {
+    // Check if AccessCode already exists (might have been created by another call)
+    const existingCodes = await client.models.AccessCode.list({
+      filter: { code: { eq: accessCode } },
+    })
+
+    if (existingCodes.data && existingCodes.data.length > 0) {
+      // Already exists, update the map
+      const ac = existingCodes.data[0] as AccessCodeRecord
+      accessCodesMap.value.set(accessCode, ac)
+      return
+    }
+
+    // Create AccessCode record
+    const recipientName =
+      recipient.mailingName || `${recipient.firstName} ${recipient.lastName}`.trim()
+    const recipientAddress = [
+      recipient.address1,
+      recipient.address2,
+      recipient.city,
+      recipient.state,
+      recipient.zipcode,
+    ]
+      .filter(Boolean)
+      .join(', ')
+
+    const result = await client.models.AccessCode.create({
+      code: accessCode,
+      recipientName: recipientName,
+      recipientAddress: recipientAddress || null,
+      used: recipient.accessCodeUsed || false,
+      usedAt: recipient.accessCodeUsedAt || null,
+      createdAt: recipient.createdAt || new Date().toISOString(),
+      invitedBy: currentUserNewsletterUserId.value || null,
+      invitationType: currentUserNewsletterUserId.value ? 'on-demand' : 'bulk',
+    })
+
+    if (result.data) {
+      const ac = result.data as AccessCodeRecord
+      accessCodesMap.value.set(accessCode, ac)
+    }
+  } catch (err) {
+    console.error('Error creating AccessCode lazily:', err)
   }
 }
 
@@ -1079,10 +1436,32 @@ function showAddDialog() {
   }, 200)
 }
 
-function editRecipient(recipient: Recipient) {
+async function editRecipient(recipient: Recipient) {
   isEditing.value = true
   form.value = { ...recipient }
   dialogVisible.value = true
+
+  // Reset invited by state
+  accessCodeRecord.value = null
+  formInvitedBy.value = null
+
+  // Fetch AccessCode if recipient has an access code
+  if (recipient.accessCode) {
+    try {
+      const accessCodes = await client.models.AccessCode.list({
+        filter: { code: { eq: recipient.accessCode } },
+      })
+      if (accessCodes.data && accessCodes.data.length > 0) {
+        accessCodeRecord.value = accessCodes.data[0]
+        formInvitedBy.value = accessCodeRecord.value.invitedBy || null
+      }
+    } catch (err) {
+      console.error('Error fetching AccessCode:', err)
+    }
+  }
+
+  // Fetch list of NewsletterUsers for inviter dropdown
+  await fetchInviterUsers()
 
   // Fix tab order after dialog opens
   setTimeout(() => {
@@ -1093,15 +1472,68 @@ function editRecipient(recipient: Recipient) {
   }, 200)
 }
 
+async function fetchInviterUsers() {
+  try {
+    // Use existing map if available, otherwise fetch
+    if (inviterUsersMap.value.size > 0) {
+      inviterUsers.value = Array.from(inviterUsersMap.value.entries()).map(([id, data]) => ({
+        id,
+        email: data.email,
+        name: data.name,
+      }))
+    } else {
+      // Fetch all NewsletterUsers (admins can assign any user as inviter)
+      const users = await client.models.NewsletterUser.list()
+      if (users.data) {
+        inviterUsers.value = users.data.map((user) => {
+          const name = getDisplayNameFromEmail(user.email)
+          return {
+            id: user.id,
+            email: user.email,
+            name,
+          }
+        })
+        // Also update the map
+        users.data.forEach((user) => {
+          if (user.id && user.email) {
+            const name = getDisplayNameFromEmail(user.email)
+            inviterUsersMap.value.set(user.id, { email: user.email, name })
+          }
+        })
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching inviter users:', err)
+    inviterUsers.value = []
+  }
+}
+
 async function saveRecipient() {
   try {
     saving.value = true
 
-    // Validate required fields - need at least first name or last name (for businesses)
-    if (!form.value.firstName?.trim() && !form.value.lastName?.trim()) {
-      alert('Either first name or last name is required')
+    // Validate required fields - need at least first name, last name, or mailing name
+    if (
+      !form.value.firstName?.trim() &&
+      !form.value.lastName?.trim() &&
+      !form.value.mailingName?.trim()
+    ) {
+      alert('Either first name, last name, or mailing name is required')
       saving.value = false
       return
+    }
+
+    // If only mailing name is provided, split it into first and last name
+    if (
+      form.value.mailingName?.trim() &&
+      !form.value.firstName?.trim() &&
+      !form.value.lastName?.trim()
+    ) {
+      const mailingNameParts = form.value.mailingName.trim().split(/\s+/)
+      if (mailingNameParts.length > 0) {
+        form.value.firstName = mailingNameParts[0]
+        form.value.lastName = mailingNameParts.slice(1).join(' ') || mailingNameParts[0]
+      }
     }
 
     // Auto-validate address if address fields are provided (unless we're skipping validation)
@@ -1339,7 +1771,6 @@ async function saveRecipient() {
       updatedAt: now,
     }
 
-
     if (isEditing.value && form.value.id) {
       // Only include fields that are allowed in UpdateRecipientInput
       const updateData = {
@@ -1373,6 +1804,28 @@ async function saveRecipient() {
           updateResult.errors[0].errorType ||
           JSON.stringify(updateResult.errors[0])
         alert(`Error updating recipient: ${errorMessage}`)
+      } else {
+        // Update AccessCode.invitedBy if it changed
+        if (form.value.accessCode && accessCodeRecord.value) {
+          const currentInvitedBy = accessCodeRecord.value.invitedBy || null
+          if (formInvitedBy.value !== currentInvitedBy) {
+            try {
+              await client.models.AccessCode.update({
+                id: accessCodeRecord.value.id,
+                invitedBy: formInvitedBy.value || null,
+              })
+              // Update the map so the list reflects the change
+              const updatedRecord = {
+                ...accessCodeRecord.value,
+                invitedBy: formInvitedBy.value || null,
+              }
+              accessCodesMap.value.set(form.value.accessCode, updatedRecord)
+            } catch (err) {
+              console.error('Error updating AccessCode invitedBy:', err)
+              // Don't block save if AccessCode update fails
+            }
+          }
+        }
       }
     } else {
       // Generate access code for new recipients
@@ -1417,7 +1870,6 @@ async function saveRecipient() {
         return
       }
 
-
       // Now update with additional fields that aren't in CreateRecipientInput
       if (result.data && result.data.id) {
         const updateData = {
@@ -1434,6 +1886,52 @@ async function saveRecipient() {
           console.error('Recipient update errors:', updateResult.errors)
           alert(`Error updating recipient: ${updateResult.errors[0].message || 'Unknown error'}`)
         } else {
+          // Create AccessCode record if it doesn't exist
+          if (recipientData.accessCode) {
+            try {
+              // Check if AccessCode already exists
+              const existingCodes = await client.models.AccessCode.list({
+                filter: { code: { eq: recipientData.accessCode } },
+              })
+
+              if (!existingCodes.data || existingCodes.data.length === 0) {
+                // Create AccessCode record
+                const recipientName =
+                  recipientData.mailingName ||
+                  `${recipientData.firstName} ${recipientData.lastName}`.trim()
+                const recipientAddress = [
+                  recipientData.address1,
+                  recipientData.address2,
+                  recipientData.city,
+                  recipientData.state,
+                  recipientData.zipcode,
+                ]
+                  .filter(Boolean)
+                  .join(', ')
+
+                await client.models.AccessCode.create({
+                  code: recipientData.accessCode,
+                  recipientName: recipientName,
+                  recipientAddress: recipientAddress || null,
+                  used: false,
+                  createdAt: now,
+                  invitedBy: formInvitedBy.value || currentUserNewsletterUserId.value || null,
+                  invitationType:
+                    formInvitedBy.value || currentUserNewsletterUserId.value ? 'on-demand' : 'bulk',
+                })
+
+                // Update the map
+                accessCodesMap.value.set(recipientData.accessCode, {
+                  id: '', // Will be set on next fetch
+                  code: recipientData.accessCode,
+                  invitedBy: formInvitedBy.value || null,
+                })
+              }
+            } catch (err) {
+              console.error('Error creating AccessCode record:', err)
+              // Don't block save if AccessCode creation fails
+            }
+          }
         }
       }
     }
@@ -1449,16 +1947,28 @@ async function saveRecipient() {
   }
 }
 
-async function deleteRecipient(recipient: Recipient) {
-  if (!recipient.id) return
+function deleteRecipient(recipient: Recipient) {
+  recipientToDelete.value = recipient
+  deleteDialogVisible.value = true
+}
 
-  if (!confirm(`Delete ${recipient.firstName} ${recipient.lastName}?`)) return
+function cancelDelete() {
+  deleteDialogVisible.value = false
+  recipientToDelete.value = null
+  selectedRecipients.value = []
+}
+
+async function deleteSingleRecipient() {
+  if (!recipientToDelete.value?.id) return
 
   try {
-    await client.models.Recipient.delete({ id: recipient.id })
+    await client.models.Recipient.delete({ id: recipientToDelete.value.id })
     await fetchRecipients()
+    deleteDialogVisible.value = false
+    recipientToDelete.value = null
   } catch (err) {
     console.error('Error deleting recipient:', err)
+    alert('Error deleting recipient. Please try again.')
   }
 }
 
@@ -1478,6 +1988,36 @@ async function regenerateCode(recipient: Recipient) {
   } catch (err) {
     console.error('Error regenerating code:', err)
   }
+}
+
+function copyRegistrationUrl(accessCode: string) {
+  if (!accessCode) return
+
+  const baseUrl = window.location.origin
+  const registrationUrl = `${baseUrl}/register?code=${accessCode}`
+
+  navigator.clipboard
+    .writeText(registrationUrl)
+    .then(() => {
+      // Show toast notification - appears briefly in top-right corner, then fades away
+      toast.add({
+        severity: 'success',
+        summary: 'Copied!',
+        detail: 'Registration URL copied to clipboard',
+        life: 3000, // Auto-dismiss after 3 seconds
+        styleClass: 'toast-success', // Custom styling for better readability
+      })
+    })
+    .catch((err) => {
+      console.error('Failed to copy URL:', err)
+      // Show error toast
+      toast.add({
+        severity: 'error',
+        summary: 'Copy Failed',
+        detail: 'Failed to copy URL. Please copy manually.',
+        life: 5000,
+      })
+    })
 }
 
 function resetDialog() {
@@ -1507,6 +2047,9 @@ function resetDialog() {
   skipValidation.value = false
   showAddressConfirmDialog.value = false
   showValidationErrorDialog.value = false
+  // Reset inviter state
+  accessCodeRecord.value = null
+  formInvitedBy.value = null
   // Reset autocomplete (removed - using Google Maps validation only)
 }
 
@@ -1554,6 +2097,7 @@ async function deleteSelectedRecipients() {
     await fetchRecipients()
     selectedRecipients.value = []
     deleteDialogVisible.value = false
+    recipientToDelete.value = null
   } catch (err) {
     console.error('Error deleting recipients:', err)
     alert('Error deleting recipients. Please try again.')
@@ -1562,12 +2106,27 @@ async function deleteSelectedRecipients() {
 
 async function generateCodesForSelected() {
   try {
-    // Generate codes for all recipients in parallel for better performance
+    // Filter out recipients who have already registered
+    const recipientsToUpdate = selectedRecipients.value
+      .map((id) => recipients.value.find((r) => r && r.id === id))
+      .filter((r): r is Recipient => r !== undefined && !r.accessCodeUsed)
+
+    const skippedCount = selectedRecipients.value.length - recipientsToUpdate.length
+
+    if (recipientsToUpdate.length === 0) {
+      alert(
+        'All selected recipients have already registered. Cannot regenerate codes for recipients who have already registered.',
+      )
+      return
+    }
+
+    // Generate codes for recipients who haven't registered yet, in parallel for better performance
     await Promise.all(
-      selectedRecipients.value.map((id) => {
+      recipientsToUpdate.map((recipient) => {
+        if (!recipient.id) return Promise.resolve()
         const newCode = generateAccessCode()
         return client.models.Recipient.update({
-          id,
+          id: recipient.id,
           accessCode: newCode,
           accessCodeUsed: false,
           accessCodeUsedAt: null,
@@ -1576,6 +2135,14 @@ async function generateCodesForSelected() {
       }),
     )
     await fetchRecipients()
+
+    if (skippedCount > 0) {
+      alert(
+        `Regenerated codes for ${recipientsToUpdate.length} recipient(s). Skipped ${skippedCount} recipient(s) who have already registered.`,
+      )
+    }
+    // No alert for successful regeneration without skips - the updated code in the list is sufficient feedback
+
     selectedRecipients.value = []
   } catch (err) {
     console.error('Error generating codes:', err)
@@ -1586,6 +2153,10 @@ async function generateCodesForSelected() {
 function onFileSelect(event: { files: File[] }) {
   const file = event.files[0]
   if (!file) return
+
+  // Clear any previous errors when a new file is selected
+  importError.value = ''
+  importPreview.value = []
 
   const reader = new FileReader()
   reader.onload = (e) => {
@@ -1610,6 +2181,7 @@ function onFileSelect(event: { files: File[] }) {
 }
 
 function parseExcel(workbook: XLSX.WorkBook) {
+  importError.value = ''
   // Get the first worksheet
   const sheetName = workbook.SheetNames[0]
   const worksheet = workbook.Sheets[sheetName]
@@ -1618,7 +2190,8 @@ function parseExcel(workbook: XLSX.WorkBook) {
   const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][]
 
   if (jsonData.length < 2) {
-    console.error('Excel file appears to be empty or has no data rows')
+    importError.value = 'Excel file appears to be empty or has no data rows.'
+    importPreview.value = []
     return
   }
 
@@ -1673,34 +2246,97 @@ function parseExcel(workbook: XLSX.WorkBook) {
     }
   }
 
+  if (preview.length === 0) {
+    importError.value =
+      'No recipients could be parsed from the Excel file. Please ensure your file has the correct column structure with at least First Name or Last Name in the expected columns.'
+  } else {
+    importError.value = ''
+  }
+
   importPreview.value = preview
 }
 
 function parseCSV(csv: string) {
-  const lines = csv.split('\n')
+  importError.value = ''
+
+  // Remove BOM (Byte Order Mark) if present
+  if (csv.charCodeAt(0) === 0xfeff) {
+    csv = csv.slice(1)
+  }
+
+  // Normalize line endings and split
+  const lines = csv
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .filter((line) => line.trim())
+
+  if (lines.length < 2) {
+    importError.value = 'CSV file appears to be empty or has no data rows.'
+    importPreview.value = []
+    return
+  }
+
+  // Parse header row to determine column mapping
+  const headerLine = lines[0].split(',').map((h) =>
+    h
+      .trim()
+      .replace(/"/g, '')
+      .replace(/\ufeff/g, '')
+      .toLowerCase(),
+  )
+  const headerMap: Record<string, number> = {}
+  headerLine.forEach((header, index) => {
+    headerMap[header] = index
+  })
+
+  // Check if required Name column exists (use 'in' operator to check for key existence, not truthiness)
+  // Note: We can't use !headerMap['name'] because if name is at index 0, !0 === true
+  if (!('name' in headerMap) && !('fullname' in headerMap)) {
+    // Debug: log available headers to help diagnose
+    const availableHeaders = Object.keys(headerMap).join(', ')
+    importError.value = `CSV file is missing the required "Name" column. Please ensure your CSV has a "Name" or "FullName" column header. Found columns: ${availableHeaders || 'none'}`
+    importPreview.value = []
+    return
+  }
 
   const preview: Recipient[] = []
 
   for (let i = 1; i < lines.length; i++) {
-    // Process all rows
     const line = lines[i].trim()
     if (!line) continue
 
     const values = line.split(',').map((v) => v.trim().replace(/"/g, ''))
 
-    if (values.length >= 3) {
+    // Helper function to get value by column name
+    const getValue = (columnName: string): string => {
+      const index = headerMap[columnName]
+      return index !== undefined ? values[index] || '' : ''
+    }
+
+    // Parse name field - could be "FirstName LastName" or just "Name"
+    const nameField = getValue('name') || getValue('fullname') || ''
+    const nameParts = nameField.split(/\s+/).filter(Boolean)
+    const firstName = nameParts[0] || ''
+    const lastName = nameParts.slice(1).join(' ') || ''
+
+    // Only include entries with at least a first name or last name
+    if (firstName || lastName) {
       const recipient: Recipient = {
-        title: values[0] || '',
-        firstName: values[1] || '',
-        secondName: values[2] || '',
-        lastName: values[3] || '',
-        address1: values[4] || '',
-        address2: values[5] || '',
-        city: values[6] || '',
-        state: values[7] || '',
-        zipcode: values[8] || '',
-        email: values[9] || '',
-        sendCard: values[10]?.toLowerCase() !== 'no',
+        title: getValue('title') || '',
+        firstName: firstName,
+        secondName: getValue('secondname') || getValue('middlename') || '',
+        lastName: lastName,
+        address1: getValue('address1') || getValue('address') || '',
+        address2: getValue('address2') || '',
+        city: getValue('city') || '',
+        state: getValue('state') || '',
+        zipcode: getValue('zipcode') || getValue('zip') || getValue('postalcode') || '',
+        country: getValue('country') || '',
+        email: getValue('email') || '',
+        sendCard:
+          getValue('sendcard')?.toLowerCase() !== 'no' &&
+          getValue('sendcard')?.toLowerCase() !== 'false',
         wantsPaper: true,
         accessCode: generateAccessCode(),
         accessCodeUsed: false,
@@ -1715,17 +2351,102 @@ function parseCSV(csv: string) {
     }
   }
 
+  if (preview.length === 0) {
+    importError.value =
+      'No recipients could be parsed from the file. Please ensure your CSV has a "Name" column and contains valid recipient data.'
+  } else {
+    importError.value = ''
+  }
+
   importPreview.value = preview
 }
 
 function cancelImport() {
   showImportDialog.value = false
   importPreview.value = []
+  importError.value = ''
+}
+
+function downloadCSVTemplate() {
+  // Create CSV content with headers
+  const headers = ['Name', 'Email', 'Address1', 'City', 'State', 'ZipCode', 'Country']
+  const csvContent = headers.join(',') + '\n'
+
+  // Create a blob and download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+
+  link.setAttribute('href', url)
+  link.setAttribute('download', 'recipients_template.csv')
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 async function importRecipients() {
   try {
     importing.value = true
+
+    // Ensure current user's NewsletterUser ID is set
+    if (!currentUserNewsletterUserId.value) {
+      await getCurrentUserNewsletterUserId()
+    }
+
+    // Check for duplicates before importing
+    const duplicates: Array<{ name: string; email?: string; reason: string }> = []
+
+    for (const recipient of importPreview.value) {
+      const firstName = (recipient.firstName || '').trim().toLowerCase()
+      const lastName = (recipient.lastName || '').trim().toLowerCase()
+      const email = recipient.email?.trim().toLowerCase() || ''
+
+      const existingRecipient = recipients.value.find((existing) => {
+        const existingFirstName = (existing.firstName || '').trim().toLowerCase()
+        const existingLastName = (existing.lastName || '').trim().toLowerCase()
+        const existingEmail = existing.email?.trim().toLowerCase() || ''
+
+        // Check by email if both have emails
+        if (email && existingEmail && email === existingEmail) {
+          return true
+        }
+
+        // Check by name (first + last)
+        if (firstName && lastName && existingFirstName && existingLastName) {
+          if (firstName === existingFirstName && lastName === existingLastName) {
+            return true
+          }
+        }
+
+        return false
+      })
+
+      if (existingRecipient) {
+        const displayName = `${recipient.firstName} ${recipient.lastName}`.trim()
+        const reason =
+          email && existingRecipient.email
+            ? `email "${email}" already exists`
+            : `name "${displayName}" already exists`
+        duplicates.push({
+          name: displayName || 'Unknown',
+          email: email || undefined,
+          reason,
+        })
+      }
+    }
+
+    if (duplicates.length > 0) {
+      importing.value = false
+      const duplicateList = duplicates
+        .slice(0, 5)
+        .map((d) => `  • ${d.name}${d.email ? ` (${d.email})` : ''} - ${d.reason}`)
+        .join('\n')
+      const moreText = duplicates.length > 5 ? `\n  ... and ${duplicates.length - 5} more` : ''
+      importError.value = `Cannot import: Found ${duplicates.length} duplicate recipient(s):\n${duplicateList}${moreText}\n\nPlease remove these recipients from the import file, or delete the existing duplicates from the recipient list first.`
+      return
+    }
 
     // Import all recipients in parallel for better performance
     // Process in batches of 25 to avoid overwhelming the API
@@ -1748,10 +2469,57 @@ async function importRecipients() {
         batch.map((recipient) => client.models.Recipient.create(recipient)),
       )
 
-      // Collect created recipients that need validation
-      results.forEach((result, index) => {
+      // Collect created recipients that need validation and create AccessCode records
+      for (let index = 0; index < results.length; index++) {
+        const result = results[index]
         if (result.data?.id) {
           const recipient = batch[index]
+
+          // Create AccessCode record if recipient has an access code
+          if (recipient.accessCode) {
+            try {
+              // Check if AccessCode already exists
+              const existingCodes = await client.models.AccessCode.list({
+                filter: { code: { eq: recipient.accessCode } },
+              })
+
+              if (!existingCodes.data || existingCodes.data.length === 0) {
+                // Create AccessCode record
+                const recipientName =
+                  recipient.mailingName || `${recipient.firstName} ${recipient.lastName}`.trim()
+                const recipientAddress = [
+                  recipient.address1,
+                  recipient.address2,
+                  recipient.city,
+                  recipient.state,
+                  recipient.zipcode,
+                ]
+                  .filter(Boolean)
+                  .join(', ')
+
+                const invitedBy = currentUserNewsletterUserId.value || null
+                console.log(
+                  'Creating AccessCode with invitedBy:',
+                  invitedBy,
+                  'for code:',
+                  recipient.accessCode,
+                )
+
+                await client.models.AccessCode.create({
+                  code: recipient.accessCode,
+                  recipientName: recipientName,
+                  recipientAddress: recipientAddress || null,
+                  used: false,
+                  createdAt: new Date().toISOString(),
+                  invitedBy: invitedBy,
+                  invitationType: invitedBy ? 'on-demand' : 'bulk',
+                })
+              }
+            } catch (err) {
+              console.error(`Error creating AccessCode for ${recipient.accessCode}:`, err)
+              // Continue with other recipients even if one fails
+            }
+          }
 
           // Only queue if address exists (city is optional for international addresses)
           if (recipient.address1) {
@@ -1768,7 +2536,7 @@ async function importRecipients() {
             })
           }
         }
-      })
+      }
     }
 
     // Queue validation requests for all imported recipients
@@ -1780,6 +2548,8 @@ async function importRecipients() {
     }
 
     await fetchRecipients()
+    // Refresh AccessCodes map to show updated inviter info
+    await fetchAccessCodesAndInviters()
     showImportDialog.value = false
     importPreview.value = []
   } catch (err) {
@@ -1834,13 +2604,9 @@ async function queueValidationRequests(
       })
       if (!response.ok) {
         const errorText = await response.text()
-        console.error(
-          `Failed to queue batch ${i / batchSize + 1}: ${response.status}`,
-          errorText,
-        )
+        console.error(`Failed to queue batch ${i / batchSize + 1}: ${response.status}`, errorText)
       }
     }
-
   } catch (error) {
     console.error('Error queuing validation requests:', error)
   }
@@ -1885,6 +2651,105 @@ async function removeDuplicates() {
   }
 }
 
+async function cleanupInvalidRecipients() {
+  if (
+    !confirm(
+      'This will attempt to find and delete recipients with invalid data (missing required fields).\n\nNote: Recipients that cannot be queried due to GraphQL errors (null required fields) cannot be deleted through this interface and must be cleaned up manually via the AWS DynamoDB Console.\n\nContinue?',
+    )
+  ) {
+    return
+  }
+
+  try {
+    // Try to fetch all recipients and delete any that have null required fields
+    // Note: Recipients that cause GraphQL errors won't appear in the data array,
+    // so we can only clean up ones that are queryable but have null values
+    let deletedCount = 0
+
+    // Try to fetch and delete invalid ones
+    let nextToken: string | null | undefined = undefined
+    do {
+      try {
+        const result = await client.models.Recipient.list({
+          limit: 1000,
+          nextToken: nextToken,
+        })
+
+        if (result.data) {
+          for (const recipient of result.data) {
+            if (
+              recipient &&
+              recipient.id &&
+              (!recipient.firstName ||
+                !recipient.lastName ||
+                !recipient.createdAt ||
+                !recipient.updatedAt)
+            ) {
+              try {
+                await client.models.Recipient.delete({ id: recipient.id })
+                deletedCount++
+                console.log(`Deleted invalid recipient with ID: ${recipient.id}`)
+              } catch (deleteErr) {
+                console.error(`Failed to delete recipient ${recipient.id}:`, deleteErr)
+              }
+            }
+          }
+        }
+
+        // Check for GraphQL errors indicating invalid recipients that can't be queried
+        if (result.errors && result.errors.length > 0) {
+          const nullFieldErrors = result.errors.filter(
+            (e) => e.message && e.message.includes('Cannot return null for non-nullable type'),
+          )
+          if (nullFieldErrors.length > 0) {
+            console.warn(
+              `⚠️ Found ${nullFieldErrors.length} recipients with null required fields that cannot be queried. These must be deleted manually via AWS DynamoDB Console.`,
+            )
+          }
+        }
+
+        nextToken = result.nextToken as string | null | undefined
+      } catch (err) {
+        console.error('Error during cleanup deletion:', err)
+        break
+      }
+    } while (nextToken)
+
+    // Try to delete known invalid recipient IDs that can't be queried
+    // These are recipients with null required fields that cause GraphQL errors
+    const knownInvalidIds = [
+      'a35c73db-ce82-4b4c-a544-22780367b8f6', // From CSV export - missing firstName, lastName, createdAt, updatedAt
+      'a749f8a5-1d33-4c27-93a7-169d373dce22', // From CSV export - missing firstName, lastName, createdAt, updatedAt
+    ]
+
+    for (const id of knownInvalidIds) {
+      try {
+        await client.models.Recipient.delete({ id })
+        deletedCount++
+        console.log(`Deleted invalid recipient with ID: ${id}`)
+      } catch (deleteErr) {
+        // Ignore errors if recipient doesn't exist or can't be deleted
+        console.warn(`Could not delete recipient ${id}:`, deleteErr)
+      }
+    }
+
+    await fetchRecipients()
+
+    if (deletedCount > 0) {
+      alert(
+        `Cleaned up ${deletedCount} invalid recipient(s).\n\nNote: If you still see GraphQL errors, there are recipients that cannot be queried and must be deleted manually via AWS DynamoDB Console.`,
+      )
+    } else {
+      alert(
+        'No queryable invalid recipients found.\n\nIf you still see GraphQL errors in the console, there are recipients with null required fields that cannot be queried via GraphQL. These must be deleted manually via the AWS DynamoDB Console.',
+      )
+    }
+  } catch (err) {
+    console.error('Error cleaning up invalid recipients:', err)
+    alert('Error cleaning up invalid recipients. Please try again.')
+  }
+}
+
 async function validateAddressBeforeSave(): Promise<boolean | null> {
   try {
     // Use Google Maps for both US and international addresses
@@ -1892,7 +2757,7 @@ async function validateAddressBeforeSave(): Promise<boolean | null> {
     await googlemapsValidator.ensureProxyUrl()
 
     const isEnabled = googlemapsValidator.isEnabled()
-    
+
     if (!isEnabled) {
       const errorMsg =
         'Google Maps Address Validation is not configured. ' +
@@ -1923,11 +2788,11 @@ async function validateAddressBeforeSave(): Promise<boolean | null> {
     if (result.error) {
       // Validation failed - show detailed error
       // Check if error message already includes "Google Maps validation failed" to avoid duplication
-      const baseError = result.error.includes('Google Maps validation failed') 
-        ? result.error 
+      const baseError = result.error.includes('Google Maps validation failed')
+        ? result.error
         : `Google Maps validation failed: ${result.error}`
-      
-      const detailedError = 
+
+      const detailedError =
         `${baseError}\n\n` +
         `Address attempted: ${address.address1}, ${address.city}, ${address.state}, ${address.zipcode}, ${address.country}\n\n` +
         `This may be due to:\n` +
@@ -1955,12 +2820,12 @@ async function validateAddressBeforeSave(): Promise<boolean | null> {
       // Normalize zipcodes for comparison (handle empty vs null vs value)
       const normalizedResultZipcode = (result.zipcode || '').trim()
       const normalizedFormZipcode = (address.zipcode || '').trim()
-      
+
       // Auto-fill missing zipcode if Google provides one
       if (normalizedResultZipcode && !normalizedFormZipcode) {
         form.value.zipcode = normalizedResultZipcode
       }
-      
+
       // Normalize addresses for comparison
       // Combine address1 + address2 for both form and result to handle cases where
       // Google combines apartment numbers into address1
@@ -1977,35 +2842,31 @@ async function validateAddressBeforeSave(): Promise<boolean | null> {
           .replace(/\s+/g, ' ') // Normalize whitespace
           .trim()
       }
-      
-      const normalizedFormAddress = normalizeAddressLine(
-        address.address1 || '',
-        address.address2
-      )
-      const normalizedResultAddress = normalizeAddressLine(
-        result.address1 || '',
-        result.address2
-      )
-      
+
+      const normalizedFormAddress = normalizeAddressLine(address.address1 || '', address.address2)
+      const normalizedResultAddress = normalizeAddressLine(result.address1 || '', result.address2)
+
       // Normalize city, state, and country for comparison (handle case and whitespace)
       const normalizeText = (text: string | null | undefined): string => {
         return (text || '').toLowerCase().trim().replace(/\s+/g, ' ')
       }
-      
+
       const normalizedFormCity = normalizeText(address.city)
       const normalizedResultCity = normalizeText(result.city)
       const normalizedFormState = normalizeText(address.state)
       const normalizedResultState = normalizeText(result.state)
       const normalizedFormCountry = normalizeText(address.country)
       const normalizedResultCountry = normalizeText(result.country)
-      
+
       // Check if address is different (ignoring zipcode if it was just auto-filled)
       const isDifferent =
         normalizedFormAddress !== normalizedResultAddress ||
         normalizedFormCity !== normalizedResultCity ||
         normalizedFormState !== normalizedResultState ||
         // Only compare zipcode if both are present
-        (normalizedFormZipcode && normalizedResultZipcode && normalizedResultZipcode !== normalizedFormZipcode) ||
+        (normalizedFormZipcode &&
+          normalizedResultZipcode &&
+          normalizedResultZipcode !== normalizedFormZipcode) ||
         normalizedFormCountry !== normalizedResultCountry
 
       if (isDifferent) {
@@ -2022,7 +2883,7 @@ async function validateAddressBeforeSave(): Promise<boolean | null> {
         validatedAddressData.value = result
         alternativeAddresses.value = result.alternatives || []
         showAlternatives.value = alternativeAddresses.value.length > 0
-        
+
         showAddressConfirmDialog.value = true
         return false // Pause save until user confirms
       } else {
@@ -2039,7 +2900,7 @@ async function validateAddressBeforeSave(): Promise<boolean | null> {
         if (result.country && !form.value.country) {
           form.value.country = result.country
         }
-        
+
         form.value.addressValidationStatus = result.deliverable ? 'valid' : 'invalid'
         form.value.addressValidationMessage = result.deliverable
           ? 'Verified by Google Maps'
@@ -2060,7 +2921,7 @@ async function validateAddressBeforeSave(): Promise<boolean | null> {
       if (result.country && !form.value.country) {
         form.value.country = result.country
       }
-      
+
       form.value.addressValidationStatus = 'valid'
       form.value.addressValidationMessage = 'Verified by Google Maps'
       form.value.addressValidatedAt = new Date().toISOString()
@@ -2284,14 +3145,23 @@ async function searchAddress(event: { query: string }) {
 
 // Update mailing name suggestion as user types
 function updateMailingName() {
+  // Don't update if we're currently splitting from mailing name field
+  // This prevents the mailing name from being overwritten while user is typing
+  if (isSplittingFromMailingName.value) {
+    return
+  }
+
   // Always update the suggestion
   const suggested = generateMailingName()
   suggestedMailingName.value = suggested
 
-  // Only auto-fill if user hasn't manually edited the mailing name field
-  if (!mailingNameManuallyEdited.value) {
-    form.value.mailingName = suggested
-  }
+  // When First/Last Name fields change, reset the manual edit flag and auto-generate
+  // This allows the mailing name to update automatically when name fields are edited,
+  // even if the user previously typed in the mailing name field
+  mailingNameManuallyEdited.value = false
+
+  // Auto-fill the mailing name with the generated suggestion
+  form.value.mailingName = suggested
 }
 
 // Handle manual input to mailing name field
@@ -2299,6 +3169,113 @@ function onMailingNameInput() {
   // Check if the user typed something different from the auto-generated value
   if (form.value.mailingName !== suggestedMailingName.value) {
     mailingNameManuallyEdited.value = true
+  }
+
+  // If mailing name is provided and first/last name are empty or match what would be split,
+  // continue splitting in real-time as user types
+  if (form.value.mailingName?.trim()) {
+    const mailingNameParts = form.value.mailingName.trim().split(/\s+/)
+
+    // Parse the name parts, handling title and suffix
+    let title = ''
+    let firstName = ''
+    let secondName = ''
+    let lastName = ''
+    let suffix = ''
+
+    // Check if first part is a title
+    const firstPart = mailingNameParts[0] || ''
+    const normalizedFirstPart = firstPart.replace(/\./g, '').toLowerCase()
+    const isTitle = titleOptions.value.some(
+      (t) => t.replace(/\./g, '').toLowerCase() === normalizedFirstPart,
+    )
+
+    // Check if last part is a suffix
+    const lastPart = mailingNameParts[mailingNameParts.length - 1] || ''
+    const normalizedLastPart = lastPart.replace(/\./g, '').toLowerCase()
+    const isSuffix = suffixOptions.value.some(
+      (s) => s.replace(/\./g, '').toLowerCase() === normalizedLastPart,
+    )
+
+    const nameStartIndex = isTitle ? 1 : 0
+    const nameEndIndex = isSuffix ? mailingNameParts.length - 1 : mailingNameParts.length
+
+    if (isTitle && mailingNameParts.length > nameStartIndex) {
+      title =
+        titleOptions.value.find(
+          (t) => t.replace(/\./g, '').toLowerCase() === normalizedFirstPart,
+        ) || firstPart
+    }
+
+    if (isSuffix && mailingNameParts.length > 0) {
+      suffix =
+        suffixOptions.value.find(
+          (s) => s.replace(/\./g, '').toLowerCase() === normalizedLastPart,
+        ) || lastPart
+    }
+
+    // Extract name parts (first, middle/second, last)
+    const nameParts = mailingNameParts.slice(nameStartIndex, nameEndIndex)
+    if (nameParts.length > 0) {
+      firstName = nameParts[0]
+      if (nameParts.length > 2) {
+        // Multiple middle names - combine all but first and last
+        secondName = nameParts.slice(1, -1).join(' ')
+        lastName = nameParts[nameParts.length - 1]
+      } else if (nameParts.length > 1) {
+        // Just first and last name
+        lastName = nameParts[nameParts.length - 1]
+      }
+    }
+
+    // Check if firstName/lastName are empty, match, or are a prefix of what we would split
+    // This allows continuous updates as the user types
+    // If mailing name is manually edited, we should always update the fields to match the parsed values
+    const firstNameEmpty = !form.value.firstName?.trim()
+    const lastNameEmpty = !form.value.lastName?.trim()
+
+    // If mailing name is being manually edited, always update the fields to match parsed values
+    // This ensures the fields stay in sync as the user types
+    // Always update if mailing name is manually edited and we have parsed values
+    // OR if both firstName and lastName are empty (initial state)
+    const shouldUpdate =
+      (mailingNameManuallyEdited.value && (firstName || lastName)) ||
+      (firstNameEmpty && lastNameEmpty)
+
+    // Continue splitting if we should update
+    if (shouldUpdate) {
+      // Set flag to prevent updateMailingName from running during split
+      isSplittingFromMailingName.value = true
+
+      if (title) {
+        form.value.title = title
+      } else {
+        // Clear title if not present in parsed name
+        form.value.title = ''
+      }
+      if (firstName) {
+        form.value.firstName = firstName
+      }
+      // Always update secondName (clear if not present)
+      form.value.secondName = secondName || ''
+      if (lastName) {
+        form.value.lastName = lastName
+      } else {
+        // If only one word, clear last name
+        form.value.lastName = ''
+      }
+      if (suffix) {
+        form.value.suffix = suffix
+      } else {
+        // Clear suffix if not present in parsed name
+        form.value.suffix = ''
+      }
+
+      // Reset flag after a short delay to allow the split to complete
+      setTimeout(() => {
+        isSplittingFromMailingName.value = false
+      }, 0)
+    }
   }
 }
 

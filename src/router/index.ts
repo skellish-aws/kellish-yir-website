@@ -6,11 +6,17 @@ const routes = [
     path: '/',
     name: 'Home',
     component: () => import('@/views/Home.vue'),
+    meta: { requiresAuth: true },
   },
   {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/Login.vue'),
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: () => import('@/views/Register.vue'),
   },
   {
     path: '/admin/newsletters',
@@ -24,6 +30,12 @@ const routes = [
     component: () => import('../views/RecipientAdmin.vue'),
     meta: { requiresAuth: true, adminOnly: true },
   },
+  // Catch-all route for 404s - redirect to home (which will redirect to login if not authenticated)
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    redirect: '/',
+  },
 ]
 
 const router = createRouter({
@@ -32,6 +44,12 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
+  // Skip auth check for login and register pages
+  if (to.path === '/login' || to.path === '/register') {
+    return next()
+  }
+
+  // Check authentication for protected routes
   if (to.meta.requiresAuth) {
     try {
       await getCurrentUser()
@@ -51,8 +69,8 @@ router.beforeEach(async (to, from, next) => {
             return next('/')
           }
         } else {
-          // No token available, redirect to home
-          return next('/')
+          // No token available, redirect to login
+          return next('/login')
         }
       }
 
